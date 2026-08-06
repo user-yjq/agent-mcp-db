@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: uv pip install --system -e ".[dev]"
+      - run: ruff check .
+      - name: Unit / security / in-process HTTP tests
+        run: python -m pytest -q
+      - name: Build wheel and verify entry points
+        run: |
+          uv build
+          python - <<'EOF'
+          import glob, zipfile
+          wheel = glob.glob("dist/*.whl")[0]
+          with zipfile.ZipFile(wheel) as zf:
+              eps_name = next(n for n in zf.namelist() if n.endswith("entry_points.txt"))
+              eps = zf.read(eps_name).decode()
+              assert "db-assistant = db_assistant_mcp.cli.main:app" in eps, "CLI 入口缺失"
+              assert "db-assistant-mcp = db_assistant_mcp.__main__:main" in eps, "MCP Server 入口缺失"
+              assert any(n.startswith("db_assistant_mcp/") for n in zf.namelist()), "包文件缺失"
+          print("wheel entry points OK:", wheel)
+          EOF
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: uv pip install --system -e ".[dev]"
+      - run: docker compose up -d --wait
+      - name: Run real-db integration tests
+        env:
+          DB_ASSISTANT_TEST_PG_HOST: 127.0.0.1
+          DB_ASSISTANT_TEST_PG_PORT: 54329
+          DB_ASSISTANT_TEST_PG_PASSWORD: test
+          DB_ASSISTANT_TEST_MYSQL_PORT: 33069
+          DB_ASSISTANT_TEST_MYSQL_PASSWORD: test
+        run: python -m pytest tests/integration -m integration -q
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [lint-and-test, integration]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # PyPI trusted publishing（或配置 UV_PUBLISH_TOKEN secret）
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: uv build
+      - run: uv publish

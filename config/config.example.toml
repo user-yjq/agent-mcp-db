@@ -1,0 +1,51 @@
+[server]
+mode = "read_only"            # read_only | safe_write | full
+default_limit = 100           # 自动追加的行数上限，1-1000
+query_timeout_sec = 10        # 查询超时，1-60
+max_concurrent = 5            # 每连接池最大并发
+schema_cache_ttl_sec = 300    # schema 快照缓存 TTL
+
+[connections.postgres-prod]
+type = "postgres"
+host = "db.internal"
+port = 5432
+database = "orders"
+user = "svc_ai"
+password_env = "DB_ASSISTANT_PG_PROD_PASSWORD"
+masked_columns = ["phone", "email", "id_card"]
+exclude_columns = ["users.salary", "orders.card_number"]
+exclude_tables = ["audit_log", "raw_events"]
+
+[connections.mysql-local]
+type = "mysql"
+host = "127.0.0.1"
+port = 3306
+database = "app"
+user = "root"
+password_env = "DB_ASSISTANT_MYSQL_LOCAL_PASSWORD"
+mode = "full"                 # 仅本地开发库
+charset = "utf8mb4"
+
+[semantic]
+glossary_file = "config/glossary.example.toml"
+templates_dir = "config/templates/"
+# 可选：LLM 辅助生成语义候选（T-1.1）；未配置时 `semantic generate` 仅用离线规则/词典
+# llm_api_key_env = "OPENAI_API_KEY"
+# llm_base_url = "https://api.openai.com/v1"     # OpenAI 兼容 Chat Completions 接口
+# llm_model = "gpt-4o-mini"
+# candidate_file = "config/glossary.candidate.toml"  # 默认与 glossary 同目录
+
+[audit]
+output = "file"               # file | stdout | webhook
+path = "~/.config/db-assistant/audit.log"
+
+[metrics]
+enabled = true
+port = 9102
+
+[http]
+# 远程共享部署（streamable HTTP）配置；token 只经环境变量注入，不落盘。
+# 未配置 token_env 或环境变量为空时，HTTP 模式拒绝启动（fail-closed），stdio 不受影响。
+# token_env = "DB_ASSISTANT_HTTP_TOKEN"
+# host = "127.0.0.1"    # 远程共享请改 0.0.0.0 并用 TLS 反向代理（见 admin-guide 3.6）
+# port = 8000
