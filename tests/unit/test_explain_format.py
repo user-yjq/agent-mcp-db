@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from db_assistant_mcp.errors import InvalidParamsError
@@ -153,6 +155,18 @@ def test_unrecognized_plan_returns_empty_tree():
     assert to_tree({"format": "json", "analyze": False, "plan": {"weird": True}}) == []
     assert to_tree({"format": "json", "analyze": False, "plan": None}) == []
     assert to_tree({"format": "json", "analyze": False, "plan": "not-a-dict"}) == []
+
+
+def test_to_tree_accepts_pg_json_string():
+    """回归：asyncpg 返回的 EXPLAIN JSON 是字符串且顶层为数组。"""
+    plan = to_tree({"format": "json", "analyze": False, "plan": json.dumps([PG_PLAN])})
+    assert plan and plan[0]["label"] == "Hash Join"
+
+
+def test_to_tree_accepts_mysql_json_string():
+    """回归：aiomysql 返回的 EXPLAIN FORMAT=JSON 是字符串。"""
+    plan = to_tree({"format": "json", "analyze": False, "plan": json.dumps(MYSQL_PLAN)})
+    assert plan and plan[0]["label"] == "QUERY_BLOCK #1"
 
 
 # ---------- summarize ----------

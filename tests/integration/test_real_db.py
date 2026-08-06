@@ -109,7 +109,8 @@ async def test_postgres_explain_tree_and_markdown():
         assert tree and tree[0]["label"]
         md = to_markdown(plan)
         assert "## 执行计划摘要" in md
-        assert "information_schema" in md
+        # PG 会把 information_schema.tables 视图展开为 pg_catalog 基表
+        assert any(t in md for t in ("pg_class", "pg_namespace", "pg_type"))
     finally:
         await conn.close()
 

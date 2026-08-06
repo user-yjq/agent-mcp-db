@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 import aiomysql
@@ -215,8 +216,13 @@ class MysqlConnection(DatabaseConnection):
             )
         try:
             _, rows = await self.fetch(f"EXPLAIN FORMAT=JSON {sql}", timeout)
-            return {"format": "json", "analyze": False, "plan": rows[0][0] if rows else None}
+            plan = rows[0][0] if rows else None
+            if isinstance(plan, str):
+                try:
+                    plan = json.loads(plan)
+                except (TypeError, ValueError):
+                    pass  # 保持原始字符串，由 format 层兜底
+            return {"format": "json", "analyze": False, "plan": plan}
         except Exception:  # noqa: BLE001  # MariaDB/MySQL5.7 不支持 FORMAT=JSON
             _, rows = await self.fetch(f"EXPLAIN {sql}", timeout)
             return {"format": "text", "analyze": False, "plan": rows}
-

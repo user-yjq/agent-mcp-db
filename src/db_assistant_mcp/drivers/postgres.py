@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 import asyncpg
@@ -224,5 +225,12 @@ class PostgresConnection(DatabaseConnection):
         plan_sql = f"EXPLAIN ({fmt}) {sql}"
         _, rows = await self.fetch(plan_sql, timeout)
         plan = rows[0][0] if rows else None
+        if isinstance(plan, str):
+            try:
+                parsed = json.loads(plan)
+                if isinstance(parsed, list) and parsed:
+                    parsed = parsed[0]
+                plan = parsed
+            except (TypeError, ValueError):
+                pass  # 保持原始字符串，由 format 层兜底
         return {"format": "json", "analyze": analyze, "plan": plan}
-

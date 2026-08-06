@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from db_assistant_mcp.errors import InvalidParamsError
@@ -146,6 +147,14 @@ def to_tree(plan_result: dict[str, Any]) -> list[dict[str, Any]]:
     if plan_result.get("format") != "json":
         return []
     plan = plan_result.get("plan")
+    if isinstance(plan, str):  # 兼容驱动/调用方传入 JSON 字符串
+        try:
+            plan = json.loads(plan)
+        except (TypeError, ValueError):
+            return []
+    if isinstance(plan, list) and plan and isinstance(plan[0], dict):
+        # PostgreSQL EXPLAIN (FORMAT JSON) 顶层是单元素数组
+        plan = plan[0]
     if not isinstance(plan, dict):
         return []
     if "Plan" in plan:  # PostgreSQL
