@@ -1,12 +1,23 @@
 from __future__ import annotations
 
 import json
+import re
 
 from typer.testing import CliRunner
 
 from db_assistant_mcp.cli.main import app
 
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    """移除 rich/typer 帮助输出中的 ANSI 转义码。
+
+    CI（GITHUB_ACTIONS=true）下 typer 强制富文本着色，高亮器会把
+    含内部连字符的选项名（如 --include-low）切成多段样式并在段间
+    插入转义码，导致字面字符串不再连续，需先剥离 ANSI 再断言。
+    """
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 def _run(*args, config_path=None):
@@ -135,7 +146,7 @@ def test_semantic_generate_missing_config(tmp_path):
 def test_semantic_generate_help():
     result = _run("semantic", "generate", "--help")
     assert result.exit_code == 0
-    assert "--include-low" in result.output
+    assert "--include-low" in _strip_ansi(result.output)
 
 
 def _write_toml(tmp_path, body: str, name: str = "config.toml"):
