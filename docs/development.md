@@ -3,17 +3,19 @@
 ## 环境
 
 ```bash
-uv venv .venv --python 3.12
-uv pip install -e ".[dev]"
+uv sync --extra dev        # 按 uv.lock 创建 .venv 并安装项目 + dev 依赖（--frozen 表示不更新锁文件）
 ```
+> 注：uv.lock 以 pypi.org 为源；服务器直连 PyPI 慢时可改用镜像源重新 lock：
+> `UV_INDEX_URL=http://mirrors.cloud.aliyuncs.com/pypi/simple/ uv lock`，
+> 或跳过锁文件用 `uv pip install -e ".[dev]"`。
 
 ## 测试
 
 ```bash
-python -m pytest -q              # 全部（163+ 用例）
-python -m pytest tests/unit      # 单元 + 安全边界
-python -m pytest tests/integration/test_mcp_client.py   # MCP stdio 集成
-python -m pytest tests/integration -m integration       # 真实 DB（需 Docker）
+uv run pytest -q                              # 全部用例
+uv run pytest tests/unit                      # 单元 + 安全边界
+uv run pytest tests/integration/test_mcp_client.py   # MCP stdio 集成
+uv run pytest tests/integration -m integration       # 真实 DB（需 Docker）
 ```
 
 真实数据库集成测试由 `DB_ASSISTANT_TEST_*` 环境变量开关，未设置自动跳过；

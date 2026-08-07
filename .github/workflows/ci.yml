@@ -18,14 +18,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: uv pip install --system -e ".[dev]"
-      - run: ruff check .
+      - run: uv sync --extra dev --frozen
+      - run: uv run ruff check .
       - name: Unit / security / in-process HTTP tests
-        run: python -m pytest -q
+        run: uv run pytest -q
       - name: Build wheel and verify entry points
         run: |
           uv build
-          python - <<'EOF'
+          uv run python - <<'EOF'
           import glob, zipfile
           wheel = glob.glob("dist/*.whl")[0]
           with zipfile.ZipFile(wheel) as zf:
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: uv pip install --system -e ".[dev]"
+      - run: uv sync --extra dev --frozen
       - run: docker compose up -d --wait
       - name: Run real-db integration tests
         env:
@@ -55,7 +55,7 @@ jobs:
           DB_ASSISTANT_TEST_PG_PASSWORD: test
           DB_ASSISTANT_TEST_MYSQL_PORT: 33069
           DB_ASSISTANT_TEST_MYSQL_PASSWORD: test
-        run: python -m pytest tests/integration -m integration -q
+        run: uv run pytest tests/integration -m integration -q
 
   publish:
     if: startsWith(github.ref, 'refs/tags/v')

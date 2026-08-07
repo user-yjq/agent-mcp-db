@@ -13,4 +13,4 @@ lint:
 	ruff check src tests
 
 test:
-	python -m pytest tests -m "not integration" -q
+	uv run pytest tests -m "not integration" -q
