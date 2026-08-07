@@ -28,6 +28,7 @@ class ServerConfig:
     query_timeout_sec: int = 10
     max_concurrent: int = 5
     schema_cache_ttl_sec: int = 300
+    config_reload_interval_sec: int = 30
 
 
 @dataclass
@@ -187,6 +188,9 @@ def _parse_server(raw: dict[str, Any]) -> ServerConfig:
         max_concurrent=_parse_int(raw.get("max_concurrent"), "server.max_concurrent", default=5, min_value=1, max_value=100),
         schema_cache_ttl_sec=_parse_int(
             raw.get("schema_cache_ttl_sec"), "server.schema_cache_ttl_sec", default=300, min_value=1, max_value=86400
+        ),
+        config_reload_interval_sec=_parse_int(
+            raw.get("config_reload_interval_sec"), "server.config_reload_interval_sec", default=30, min_value=0, max_value=86400
         ),
     )
 

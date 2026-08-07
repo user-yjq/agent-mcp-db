@@ -458,9 +458,9 @@
 
 | ID | 待办 | 说明 | 归属 |
 |---|---|---|---|
-| B-1 | /healthz 深度健康检查 | 池耗尽/连接降级时 healthz 的响应行为（当前为活性探针，FakeRegistry 直返 ok） | 并入 Phase 3（HTTP 部署，T-3.x） |
-| B-2 | 配置热重载 | 配置文件变更后生效；当前启动时加载一次 | v0.2 或 v0.3 特性 |
-| B-3 | MCP 层重连 e2e | execute_query 在连接中断期间的重连行为（池层已有单测覆盖） | 并入 Phase 3 集成测试（T-3.4） |
+| B-1 | /healthz 深度健康检查 | 池耗尽/连接降级时 healthz 的响应行为（当前为活性探针，FakeRegistry 直返 ok） | ✅ 已完成（2026-08-07，见下方更新日志） |
+| B-2 | 配置热重载 | 配置文件变更后生效；当前启动时加载一次 | ✅ 已完成（2026-08-07，见下方更新日志） |
+| B-3 | MCP 层重连 e2e | execute_query 在连接中断期间的重连行为（池层已有单测覆盖） | ✅ 已完成（2026-08-07，见下方更新日志） |
 
 
 ---
@@ -505,3 +505,11 @@
 | 2026-08-06 | Phase 4 体验与安全完善完成（T-4.2~T-4.4）：`db-assistant config validate`（文件/权限/TOML/schema/连接/HTTP 结构化检查）与 `db-assistant doctor`（配置+依赖版本+glossary+连接连通性+metrics 端口占用，含 error 时退出码非 0），新增 cli/diagnostics.py（18 例单测）；`logs --slow --threshold <ms>` 慢查询筛选（AuditLogger.read 支持 min_duration_ms，与 --user/--connection/--tool 可组合，非 file 输出给出提示）；安全回归 tests/security/（40 例）：HTTP 鉴权绕过（9 种畸形 Authorization 全 401 + 未授权不执行工具）、translate 产物注入 fail-closed、**修复 semantic_gen.write_candidates TOML 注入漏洞**（恶意 meaning/表列名换行/引号/控制字符转义，防止 LLM prompt 注入破坏候选文件）、相似表建议不泄露 excluded 表；全量 **365 passed / 2 deselected** | Codex |
 
 | 2026-08-06 | Phase 5 发布与文档完成（T-5.1~T-5.3）：版本升至 0.2.0；新增 scripts/build_wheel.py（PEP 427 纯 Python wheel，标准库实现，离线/内网回退）与 Makefile（build/publish/lint/test）；`db-assistant --version` 顶层选项（入口验收）；干净 venv 安装 wheel 验证：`db-assistant --version`、`python -m db_assistant_mcp --version` 均正常、`--help` 不打印 CLI help；CI 增加 wheel 构建+入口校验与 v* tag 发布 job；文档升级：mcp_db.md 头部/版本规划/§8 技术选型与结构/§13 发布章节全部与 Python 实现对齐（清除 TypeScript/npm 与 webhook v2 等过时描述）、admin-guide webhook 与版本规划修正、README 安装段；全量 **366 passed / 2 deselected**；CI 实际全绿需推送 GitHub 后验证 | Codex |
+
+| 2026-08-06 | CI 失败修复（补记，18:23–19:06 会话未写入日志）：① `tests/test_cli.py` 新增 `_strip_ansi`——CI（GITHUB_ACTIONS=true）下 typer 强制富文本着色，高亮器把含内部连字符的选项名切成多段样式并插入转义码，帮助输出断言失败；② explain 解析回归——真实 PG/MySQL 的 `EXPLAIN (FORMAT JSON)` 返回的是 JSON **字符串**，驱动层此前未解析导致集成测试失败，已改为解析为树并保留 text 降级（explain_format.py / drivers/postgres.py / drivers/mysql.py / test_drivers_explain.py 4 例 + test_explain_format.py / test_real_db.py 同步）；19:06 全量跑通（lastfailed 为空） | Codex |
+
+| 2026-08-07 | CI 修复后等价验证（沙箱外）：全量 **380 passed / 5 skipped**（真实库集成用例按 env 跳过）/ 0 failed，ruff check 全过，wheel 构建+入口校验 OK；真实 PG/MySQL 集成（docker compose，CI 同参数）**5 passed**。备注：Codex 沙箱内 asyncio self-pipe 唤醒失效，导致 MCP stdio 客户端用例（tests/integration/test_mcp_client.py）与 observability 2 个 socket 用例无法在沙箱内运行，沙箱外均正常，非项目问题；CI 全绿仍需推送 GitHub 后确认 | Codex |
+
+| 2026-08-07 | v0.2 遗留测试项收尾（B-1 / B-3）：① B-1 /healthz 深度健康检查——新增 tests/integration/test_http_server.py 3 例（真实 RuntimeRegistry/DriverPool + ASGITransport，进程内无需 socket）：连接池耗尽（max_concurrent=1 占用槽位）时快速返回 503 且明细含"连接池耗尽"、连接降级（ping 拒绝）时 503 + ok=False + 错误明细、健康检查超时返回 503 + "health check timeout"；② B-3 MCP 层重连 e2e——新增 tests/integration/test_reconnect_e2e.py 2 例（create_server + FastMCP.call_tool 进程内全链路）：execute_query 在连接中断（ConnectionResetError）时自动重建连接成功返回且审计 allowed=True、重连也失败时返回结构化错误不崩溃且审计 allowed=False；沙箱外全量 **385 passed / 5 skipped（真实库集成需 env）/ 0 failed**，ruff 全过 | Codex |
+
+| 2026-08-07 | B-2 配置热重载完成：`[server].config_reload_interval_sec`（默认 30 秒，0 关闭）；RuntimeRegistry.reload 协调——连接增删改（删除关池/变更重建/新增懒构建）、`[server]` 全局参数变更重建全部运行时、`[audit]` 与 glossary 文件变更重建审计器/词表与运行时、`[http]`/`[metrics]` 变更记入 restart_required 需重启；server 轮询器 `_config_reload_loop`（mtime+size 检测，加载失败保留旧配置继续服务并自动重试，stdio 与 HTTP 模式共用 lifespan 启停）；新增 tests/unit/test_reload.py 14 例（解析默认/自定义/0/非法、增删改/全局重建/审计/glossary/restart_required、轮询器变更检测与无效配置兜底）；admin-guide 2.4 配置热重载、mcp_db 7.2 配置示例同步 | Codex |

@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import uvicorn
@@ -52,7 +53,19 @@ def create_server(app_config: AppConfig, *, host: str | None = None, port: int |
                 log_context(logger, 20, "指标端点已启动", port=app_config.metrics.port)
             except OSError as exc:
                 log_context(logger, 40, "指标端点启动失败（端口冲突）", port=app_config.metrics.port, error=str(exc))
+        reload_task = None
+        reload_interval = app_config.server.config_reload_interval_sec
+        if reload_interval > 0:
+            reload_task = asyncio.create_task(
+                _config_reload_loop(registry, app_config.config_path, reload_interval)
+            )
         yield {"registry": registry}
+        if reload_task is not None:
+            reload_task.cancel()
+            try:
+                await reload_task
+            except asyncio.CancelledError:
+                pass
         if http_runner:
             await http_runner.cleanup()
         await registry.close_all()
@@ -113,6 +126,41 @@ def _attach_observability_routes(app: Starlette, registry: RuntimeRegistry) -> N
 
     app.add_route("/healthz", healthz_handler, methods=["GET"])
     app.add_route("/metrics", metrics_handler, methods=["GET"])
+
+
+def _config_stat(path: str) -> tuple[int, int] | None:
+    try:
+        st = Path(path).stat()
+    except OSError:
+        return None
+    return st.st_mtime_ns, st.st_size
+
+
+async def reload_config_if_changed(
+    registry: RuntimeRegistry, config_path: str, last_stat: tuple[int, int] | None
+) -> tuple[bool, dict[str, Any] | None]:
+    """配置文件 mtime/size 变化时重新加载并热重载；无效配置抛 ConfigError（由调用方兜底）。"""
+    current = _config_stat(config_path)
+    if current == last_stat:
+        return False, None
+    new_config = load_config(config_path)
+    summary = await registry.reload(new_config)
+    return True, summary
+
+
+async def _config_reload_loop(registry: RuntimeRegistry, config_path: str, interval: float) -> None:
+    """周期轮询配置文件变更并热重载；加载失败保留旧配置继续服务（下个周期自动重试）。"""
+    last_stat = _config_stat(config_path)
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            changed, summary = await reload_config_if_changed(registry, config_path, last_stat)
+        except Exception as exc:  # noqa: BLE001
+            log_context(logger, 40, "配置热重载失败，保留当前配置", error=str(exc)[:500])
+            continue
+        if changed:
+            last_stat = _config_stat(config_path)
+            log_context(logger, 20, "配置热重载完成", summary=str(summary))
 
 
 def build_http_app(

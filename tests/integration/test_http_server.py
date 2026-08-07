@@ -9,6 +9,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -16,7 +17,9 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 from db_assistant_mcp.config import load_config
-from db_assistant_mcp.server import build_http_app
+from db_assistant_mcp.drivers.base import DatabaseConnection
+from db_assistant_mcp.security.http_auth import BearerTokenMiddleware
+from db_assistant_mcp.server import _attach_observability_routes, build_http_app, create_server
 
 TOKEN = "test-token-for-http-tests"
 BASE = "http://localhost:8000"
@@ -27,12 +30,12 @@ ALL_TOOLS = {
 }
 
 
-def _write_config(tmp_path: Path) -> Path:
+def _write_config(tmp_path: Path, *, max_concurrent: int | None = None) -> Path:
     cfg = tmp_path / "config.toml"
+    server_section = f"[server]\nmode = \"read_only\"\nmax_concurrent = {max_concurrent}\n" if max_concurrent else ""
     cfg.write_text(
         f"""
-[server]
-mode = "read_only"
+{server_section}
 [audit]
 output = "file"
 path = "{tmp_path / 'audit.log'}"
@@ -164,3 +167,106 @@ async def test_http_healthz_reports_unhealthy_when_db_unreachable(http_app):
         payload = resp.json()
         assert payload["status"] == "unhealthy"
         assert payload["connections"]["demo"]["ok"] is False
+
+
+class _StubConn(DatabaseConnection):
+    """可注入故障的假连接（仅用于健康检查相关行为验证）。"""
+
+    dialect = "postgres"
+
+    def __init__(self, *, ping_ok: bool = True) -> None:
+        self.ping_ok = ping_ok
+
+    async def close(self) -> None:
+        pass
+
+    async def connect(self) -> None:
+        pass
+
+    async def is_valid(self) -> bool:
+        return True
+
+    async def ping(self) -> float:
+        if not self.ping_ok:
+            raise ConnectionRefusedError("connection refused")
+        return 1.0
+
+    async def fetch(self, sql: str, timeout: float) -> tuple[list[str], list[list[Any]]]:
+        return ["one"], [[1]]
+
+    async def list_tables(self) -> list[dict[str, Any]]:
+        return []
+
+    async def table_schema(self, table: str) -> dict[str, Any]:
+        return {"columns": [], "indexes": [], "foreign_keys": []}
+
+    async def search_schema(self, keyword: str) -> dict[str, list[dict[str, str]]]:
+        return {"tables": [], "columns": []}
+
+    async def explain(self, sql: str, analyze: bool, timeout: float) -> dict[str, Any]:
+        return {}
+
+
+def _build_http_with_registry(tmp_path: Path, monkeypatch, *, max_concurrent: int | None = None):
+    """按 build_http_app 同样装配，但暴露 registry 供测试注入连接故障。"""
+    monkeypatch.setenv("DB_ASSISTANT_HTTP_TOKEN", TOKEN)
+    app_config = load_config(str(_write_config(tmp_path, max_concurrent=max_concurrent)))
+    mcp = create_server(app_config)
+    app = mcp.streamable_http_app()
+    _attach_observability_routes(app, mcp._registry)  # type: ignore[attr-defined]
+    return BearerTokenMiddleware(app, TOKEN), mcp._registry  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_healthz_pool_exhausted_returns_503_with_detail(tmp_path, monkeypatch):
+    """B-1：连接池耗尽时 /healthz 快速返回 503 且带 连接池耗尽 明细（不被池队列阻塞）。"""
+    wrapped, registry = _build_http_with_registry(tmp_path, monkeypatch, max_concurrent=1)
+    pool = registry.get("demo").pool
+    await pool._sem.acquire()  # 占用唯一槽位模拟池耗尽
+    try:
+        transport = httpx.ASGITransport(app=wrapped)
+        async with httpx.AsyncClient(transport=transport, base_url=BASE) as client:
+            resp = await client.get("/healthz", headers={"Authorization": f"Bearer {TOKEN}"})
+        assert resp.status_code == 503
+        payload = resp.json()
+        assert payload["status"] == "unhealthy"
+        assert payload["connections"]["demo"]["ok"] is False
+        assert "连接池耗尽" in payload["connections"]["demo"]["error"]
+    finally:
+        pool._sem.release()
+
+
+@pytest.mark.asyncio
+async def test_healthz_ping_failure_returns_503_with_detail(tmp_path, monkeypatch):
+    """B-1：连接降级（ping 失败）时 /healthz 返回 503 且连接明细 ok=False。"""
+    wrapped, registry = _build_http_with_registry(tmp_path, monkeypatch)
+    pool = registry.get("demo").pool
+    pool._make_conn = lambda: _StubConn(ping_ok=False)  # type: ignore[method-assign]
+
+    transport = httpx.ASGITransport(app=wrapped)
+    async with httpx.AsyncClient(transport=transport, base_url=BASE) as client:
+        resp = await client.get("/healthz", headers={"Authorization": f"Bearer {TOKEN}"})
+    assert resp.status_code == 503
+    payload = resp.json()
+    assert payload["status"] == "unhealthy"
+    assert payload["connections"]["demo"]["ok"] is False
+    assert "connection refused" in payload["connections"]["demo"]["error"]
+
+
+@pytest.mark.asyncio
+async def test_healthz_timeout_returns_503_with_message(tmp_path, monkeypatch):
+    """B-1：健康检查超时（wait_for 到期）时返回 503 与明确提示，不挂起。"""
+    wrapped, registry = _build_http_with_registry(tmp_path, monkeypatch)
+
+    async def _slow_ping(name=None):
+        raise TimeoutError("simulated health check timeout")
+
+    monkeypatch.setattr(registry, "ping", _slow_ping)
+
+    transport = httpx.ASGITransport(app=wrapped)
+    async with httpx.AsyncClient(transport=transport, base_url=BASE) as client:
+        resp = await client.get("/healthz", headers={"Authorization": f"Bearer {TOKEN}"})
+    assert resp.status_code == 503
+    payload = resp.json()
+    assert payload["status"] == "unhealthy"
+    assert payload["error"] == "health check timeout"

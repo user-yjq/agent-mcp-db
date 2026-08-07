@@ -65,6 +65,7 @@ default_limit = 100
 query_timeout_sec = 10
 max_concurrent = 5
 schema_cache_ttl_sec = 300
+config_reload_interval_sec = 30   # 配置热重载轮询间隔（秒），0 = 关闭热重载
 
 [connections.postgres-prod]
 type = "postgres"
@@ -106,6 +107,24 @@ port = 9102                 # Prometheus 端点
 ```bash
 export DB_ASSISTANT_PG_PROD_PASSWORD="your-password"
 ```
+
+### 2.4 配置热重载（v0.2）
+
+服务运行期间会按 `[server].config_reload_interval_sec`（默认 30 秒，0 关闭）轮询配置文件，
+检测到变更后自动生效，无需重启：
+
+- **连接增删改**：新增连接立即可用；删除的连接池被关闭；连接参数（host/port/账号等）变更后
+  旧池被重建，进行中的查询不受影响
+- **`[server]` 全局参数**：`default_limit` / `query_timeout_sec` / `max_concurrent` 等变更后
+  所有连接运行时重建
+- **`[audit]` 与 glossary 文件**：变更后审计器/语义词表重新加载，运行时同步重建
+- **环境变量凭据**：重载时会重新读取 `password_env` 引用的环境变量
+
+注意事项：
+- 配置文件写坏（TOML 语法错误、必填字段缺失）时**保留旧配置继续服务**，并每周期记录告警，
+  修复后自动生效（不会中断正在运行的查询）
+- `[http]`（端口/token）与 `[metrics]` 变更**不热生效**，需重启进程
+- stdio 与 streamable-http 两种模式均支持热重载
 
 ---
 

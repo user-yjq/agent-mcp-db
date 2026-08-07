@@ -298,6 +298,7 @@ mode = "read_only"          # read_only | safe_write | full
 default_limit = 100
 query_timeout_sec = 10
 max_concurrent = 5
+config_reload_interval_sec = 30   # 配置热重载轮询间隔（秒），0 = 关闭；[http]/[metrics] 变更需重启
 
 [connections.postgres-prod]
 type = "postgres"
