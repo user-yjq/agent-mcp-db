@@ -79,6 +79,30 @@ class Glossary:
                 return term
         return None
 
+    def search_terms(self, keyword: str) -> list[GlossaryTerm]:
+        """按语义词（meaning）匹配已审核术语，供 search_schema 命中中文语义。"""
+        kw = keyword.lower()
+        matched: list[GlossaryTerm] = []
+        for term in self.terms:
+            if term.status not in ("approved", "reviewed"):
+                continue
+            if term.meaning and kw in term.meaning.lower():
+                matched.append(term)
+        return matched
+
+    def term_matches(self, term: GlossaryTerm, table: str, column: str) -> bool:
+        """术语是否覆盖指定 表/列（pattern 术语按正则展开）。"""
+        if term.table and term.table.lower() != table.lower():
+            return False
+        if term.pattern:
+            try:
+                return re.compile(term.pattern).search(column) is not None
+            except re.error:
+                return False
+        if term.column:
+            return term.column.lower() == column.lower()
+        return False
+
     def enrich_columns(self, table: str | None, columns: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """为 schema 列追加 meaning（仅已审核术语）。"""
         for col in columns:

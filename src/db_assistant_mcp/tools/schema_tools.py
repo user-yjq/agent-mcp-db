@@ -28,7 +28,8 @@ def register(registry: RuntimeRegistry) -> dict[str, object]:
 
     @tool_handler(registry, "search_schema")
     async def search_schema(connection: str, keyword: str) -> dict:
-        """按关键字模糊搜索表与列。connection: 连接名；keyword: 搜索关键字。"""
+        """按关键字模糊搜索表与列，并命中 glossary 语义词（含 pattern 展开，结果附 meaning）。
+        connection: 连接名；keyword: 搜索关键字。"""
         runtime = registry.get(connection)
         result = await runtime.schema.search(keyword)
         return {"connection": connection, **result}

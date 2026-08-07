@@ -156,7 +156,7 @@ sequenceDiagram
 | `list_databases` | 无 | 数据库/连接列表 | 让 AI 知道可用数据源 |
 | `list_tables` | database, schema? | 表名 + 行数估算 | 浏览库结构 |
 | `get_table_schema` | database, table | 列/类型/主外键/索引/注释 | 写 SQL 前的核心上下文 |
-| `search_schema` | keyword | 匹配的表/列及位置 | 模糊搜索，开发高频操作 |
+| `search_schema` | keyword | 匹配的表/列（含 glossary 语义词与 meaning） | 模糊搜索 + 中文语义命中，开发高频操作 |
 | `execute_query` | sql, limit? | 行数据 + 列信息 | 只读执行 SELECT |
 | `translate_sql` | sql, from_dialect, to_dialect | 转换后 SQL + warnings | MySQL ↔ PostgreSQL 方言转换（产物只读回验） |
 | `explain_query` | sql, analyze?, format? | 执行计划（raw/tree/markdown） | 辅助 SQL 优化 |

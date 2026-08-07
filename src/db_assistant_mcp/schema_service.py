@@ -139,6 +139,7 @@ class SchemaService:
         return [{"name": name, "score": round(score, 3)} for score, name in scored[:limit]]
 
     async def search(self, keyword: str) -> dict[str, Any]:
+        """按关键字模糊搜索表与列；同时命中 glossary 语义词（含 pattern 展开）。"""
         summary = await self.get_summary()
         kw = keyword.lower()
         tables = [
@@ -146,10 +147,29 @@ class SchemaService:
             for t in summary["tables"]
             if kw in t["name"].lower()
         ]
-        columns = [
-            {"table": t["name"], "column": c["name"]}
-            for t in summary["tables"]
-            for c in t["columns"]
-            if kw in c["name"].lower() or kw in t["name"].lower()
-        ]
-        return {"keyword": keyword, "tables": tables[:50], "columns": columns[:100]}
+        columns: dict[tuple[str, str], dict[str, Any]] = {}
+        # 1) 表/列名子串命中（原有行为），并附带 glossary meaning
+        for t in summary["tables"]:
+            for c in t["columns"]:
+                if kw in c["name"].lower() or kw in t["name"].lower():
+                    entry = {"table": t["name"], "column": c["name"]}
+                    term = self._glossary.lookup(t["name"], c["name"])
+                    if term and term.meaning:
+                        entry["meaning"] = term.meaning
+                    columns[(t["name"], c["name"])] = entry
+        # 2) 语义词命中：meaning 含关键字 → 解析到具体表/列（excluded 表/列天然被 summary 过滤）
+        for term in self._glossary.search_terms(kw):
+            for t in summary["tables"]:
+                for c in t["columns"]:
+                    if self._glossary.term_matches(term, t["name"], c["name"]):
+                        entry = columns.setdefault(
+                            (t["name"], c["name"]),
+                            {"table": t["name"], "column": c["name"]},
+                        )
+                        if term.meaning:
+                            entry["meaning"] = term.meaning
+        return {
+            "keyword": keyword,
+            "tables": tables[:50],
+            "columns": list(columns.values())[:100],
+        }

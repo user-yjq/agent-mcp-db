@@ -57,7 +57,7 @@ python -m db_assistant_mcp
 | `list_databases` | 列出已配置的连接 |
 | `list_tables` | 列出连接下的表与行数估算 |
 | `get_table_schema` | 获取表结构：列/类型/主外键/索引/注释 |
-| `search_schema` | 模糊搜索表/列 |
+| `search_schema` | 模糊搜索表/列（命中 glossary 中文语义词，含 pattern 展开） |
 | `execute_query` | 只读执行 SELECT / WITH / EXPLAIN |
 | `explain_query` | 查看执行计划（analyze / format: raw、tree、markdown） |
 | `translate_sql` | SQL 方言转换（postgres ↔ mysql，产物只读回验） |

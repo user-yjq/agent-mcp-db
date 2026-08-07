@@ -26,7 +26,7 @@ db-assistant-mcp 已接入 Codex（`codex mcp add db-assistant`，stdio 模式�
 | ID | 任务 | 优先级 | 状态 |
 |---|---|---|---|
 | C-1 | 数据库错误明细透出给 AI：`AppError.to_dict()` 截断透出 detail；`execute_query`/`explain_query` 的 DB 异常包装为「类型 + 单行消息」（≤300 字符）并带自纠 hint；审计同步记录 | P0 | ✅ 已完成（2026-08-07） |
-| C-2 | `search_schema` 接入 glossary：中文语义词命中对应表/列（含 pattern 匹配） | P1 | ⬜ 待办 |
+| C-2 | `search_schema` 接入 glossary：中文语义词命中对应表/列（含 pattern 匹配） | P1 | ✅ 已完成（2026-08-07） |
 | C-3 | 审计 stdout 模式防护：stdio 传输下禁止 stdout 输出（降级/告警），避免污染 JSON-RPC 流 | P2 | ⬜ 待办 |
 
 ---

@@ -8,6 +8,6 @@ column = "order_status"
 meaning = "订单状态：pending/paid/shipped/completed/cancelled"
 
 [[terms]]
-pattern = ".*_status$"
+pattern = ".*_?status$"  # 覆盖 status 与 order_status 等
 meaning = "状态字段，取值见对应枚举表"
 
