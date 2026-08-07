@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from db_assistant_mcp.errors import (
+    AI_DETAIL_MAX,
     ErrorCode,
     SecurityRejectedError,
     TableNotFoundError,
@@ -15,7 +16,8 @@ def test_error_codes_exist():
         assert ErrorCode(code) is not None  # Python 3.11 StrEnum 不支持 str in Enum
 
 
-def test_to_dict_excludes_detail():
+def test_to_dict_includes_truncated_detail():
+    """C-1: detail 截断后透出给 AI，便于模型自纠。"""
     exc = SecurityRejectedError(
         "语句被拒绝",
         detail="FORBIDDEN_ROOT:drop",
@@ -24,9 +26,20 @@ def test_to_dict_excludes_detail():
     )
     payload = exc.to_dict()
     assert payload["error"] == "SECURITY_REJECTED"
-    assert "detail" not in payload
+    assert payload["detail"] == "FORBIDDEN_ROOT:drop"
     assert payload["hint"]
     assert payload["connection"] == "prod"
+
+
+def test_to_dict_truncates_overlong_detail():
+    exc = SecurityRejectedError("语句被拒绝", detail="x" * (AI_DETAIL_MAX * 2))
+    payload = exc.to_dict()
+    assert len(payload["detail"]) == AI_DETAIL_MAX
+
+
+def test_to_dict_omits_detail_when_absent():
+    exc = SecurityRejectedError("语句被拒绝")
+    assert "detail" not in exc.to_dict()
 
 
 def test_table_not_found_hint():

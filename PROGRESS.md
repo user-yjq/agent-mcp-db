@@ -465,12 +465,29 @@
 
 ---
 
+
+---
+
+## 6.5 v0.3 规划（2026-08-07，Codex 接入实测反馈）
+
+| ID | 任务 | 优先级 | 状态 |
+|---|---|---|---|
+| C-1 | 数据库错误明细透出给 AI（`to_dict` 截断透出 detail；execute_query/explain_query DB 异常包装为「类型+单行消息」+ 自纠 hint；审计同步） | P0 | ✅ 已完成（2026-08-07，见下方更新日志） |
+| C-2 | `search_schema` 接入 glossary 中文语义（含 pattern 匹配） | P1 | ⬜ 待办 |
+| C-3 | 审计 stdout 模式在 stdio 传输下的协议污染防护 | P2 | ⬜ 待办 |
+
+详细任务清单见 [plan_v0.3.md](./plan/plan_v0.3.md)。
+
+---
+
 ## 7. 相关文档
+
 
 - [MCP 协议设计](./mcp_db.md)
 - [管理员手册](./admin-guide.md)
 - [实施计划](./plan/plan_v0.1.md)
 - [v0.2 实施计划](./plan/plan_v0.2.md)
+- [v0.3 实施计划](./plan/plan_v0.3.md)
 
 ---
 
@@ -513,3 +530,6 @@
 | 2026-08-07 | v0.2 遗留测试项收尾（B-1 / B-3）：① B-1 /healthz 深度健康检查——新增 tests/integration/test_http_server.py 3 例（真实 RuntimeRegistry/DriverPool + ASGITransport，进程内无需 socket）：连接池耗尽（max_concurrent=1 占用槽位）时快速返回 503 且明细含"连接池耗尽"、连接降级（ping 拒绝）时 503 + ok=False + 错误明细、健康检查超时返回 503 + "health check timeout"；② B-3 MCP 层重连 e2e——新增 tests/integration/test_reconnect_e2e.py 2 例（create_server + FastMCP.call_tool 进程内全链路）：execute_query 在连接中断（ConnectionResetError）时自动重建连接成功返回且审计 allowed=True、重连也失败时返回结构化错误不崩溃且审计 allowed=False；沙箱外全量 **385 passed / 5 skipped（真实库集成需 env）/ 0 failed**，ruff 全过 | Codex |
 
 | 2026-08-07 | B-2 配置热重载完成：`[server].config_reload_interval_sec`（默认 30 秒，0 关闭）；RuntimeRegistry.reload 协调——连接增删改（删除关池/变更重建/新增懒构建）、`[server]` 全局参数变更重建全部运行时、`[audit]` 与 glossary 文件变更重建审计器/词表与运行时、`[http]`/`[metrics]` 变更记入 restart_required 需重启；server 轮询器 `_config_reload_loop`（mtime+size 检测，加载失败保留旧配置继续服务并自动重试，stdio 与 HTTP 模式共用 lifespan 启停）；新增 tests/unit/test_reload.py 14 例（解析默认/自定义/0/非法、增删改/全局重建/审计/glossary/restart_required、轮询器变更检测与无效配置兜底）；admin-guide 2.4 配置热重载、mcp_db 7.2 配置示例同步 | Codex |
+
+| 2026-08-07 | v0.3 C-1 数据库错误明细透出给 AI（Codex 实测反馈）：`AppError.to_dict()` 截断透出 detail（`AI_DETAIL_MAX=300`，无 detail 字段缺省），DB 异常包装为「类型 + 单行消息」；`execute_query` 与 `explain_query` 的通用异常分支统一转 `INTERNAL_ERROR` 并带 `detail` + 自纠 hint（此前 explain 的 DB 错误只回"工具内部错误"）；审计同步记录同明细；安全回归保持：SecurityRejectedError message 通用不暴露原始语句、规则编码经 detail 透出、excluded 表名不泄露；实测坏 SQL 返回 `DatatypeMismatchError: recursive query "tree" column 5 ...`、explain 返回 `UndefinedColumnError: column "foo" does not exist`；新增/更新 tests/unit/test_errors.py（3 例）、test_gateway.py（2 例）、test_sql_validator.py（1 例）；全量 **408 collected，exit 0**，ruff 全过 | Codex |
+

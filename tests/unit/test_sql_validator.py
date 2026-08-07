@@ -117,8 +117,9 @@ def test_ensure_read_only_raises_generic_message(validator):
         validator.ensure_read_only("DROP TABLE users")
     payload = exc_info.value.to_dict()
     assert payload["error"] == "SECURITY_REJECTED"
-    assert "DROP" not in payload["message"]  # 不暴露具体拒绝原因
-    assert exc_info.value.detail  # 明细仅在日志/审计
+    assert "DROP" not in payload["message"]  # message 保持通用，不暴露原始语句
+    assert "FORBIDDEN_ROOT" in payload["detail"]  # C-1: 规则编码透出，便于模型自纠
+    assert exc_info.value.detail
 
 
 def test_add_limit():

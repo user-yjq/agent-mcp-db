@@ -1,7 +1,7 @@
 """统一错误码与异常类型。
 
-所有工具调用返回结构化 JSON；错误不向客户端暴露内部细节，
-具体原因仅写入审计/日志。
+所有工具调用返回结构化 JSON；detail 截断后透出给 AI 便于自纠，
+敏感原始值仍仅写入审计/日志。
 """
 
 from __future__ import annotations
@@ -22,6 +22,10 @@ class ErrorCode(StrEnum):
     RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND"
     INTERNAL_ERROR = "INTERNAL_ERROR"
     AUDIT_ERROR = "AUDIT_ERROR"
+
+
+# 透出给 AI 的 detail 最大长度（截断防泄露）
+AI_DETAIL_MAX = 300
 
 
 class AppError(Exception):
@@ -48,11 +52,13 @@ class AppError(Exception):
         self.context = context or {}
 
     def to_dict(self) -> dict[str, Any]:
-        """面向 AI 客户端的结构化错误（不包含 detail）。"""
+        """面向 AI 客户端的结构化错误（detail 截断后透出，便于模型自纠）。"""
         payload: dict[str, Any] = {
             "error": self.code.value,
             "message": self.message,
         }
+        if self.detail is not None:
+            payload["detail"] = self.detail[:AI_DETAIL_MAX]
         if self.connection is not None:
             payload["connection"] = self.connection
         if self.hint is not None:

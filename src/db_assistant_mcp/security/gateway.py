@@ -16,6 +16,12 @@ from db_assistant_mcp.security.redactor import Redactor
 from db_assistant_mcp.security.sql_validator import SqlValidator
 
 
+def _db_error_detail(exc: Exception, max_len: int = 300) -> str:
+    """把数据库驱动异常整理为给 AI 的安全明细：异常类型 + 单行消息，截断。"""
+    text = " ".join(str(exc).split())
+    return f"{type(exc).__name__}: {text[:max_len]}"
+
+
 class SecurityGateway:
     """校验 → 限制 → 执行 → 脱敏 → 审计。"""
 
@@ -128,13 +134,20 @@ class SecurityGateway:
             raise
         except Exception as exc:  # noqa: BLE001
             duration = (time.monotonic() - start) * 1000
+            db_error = _db_error_detail(exc)
             metrics.tool_calls.labels(tool="execute_query", connection=self.name, result="error").inc()
             self._record(
                 tool="execute_query", sql=sql, rows=0, duration_ms=duration,
                 allowed=False, client=client, user=user,
-                detail={"detail": "INTERNAL_ERROR", "error": str(exc)[:500]},
+                detail={"detail": db_error, "error": "INTERNAL_ERROR"},
             )
-            raise AppError("执行查询时发生内部错误", code=ErrorCode.INTERNAL_ERROR, connection=self.name) from exc
+            raise AppError(
+                "执行查询时发生内部错误",
+                code=ErrorCode.INTERNAL_ERROR,
+                connection=self.name,
+                detail=db_error,
+                hint="请检查 SQL 语法、表/列名与数据类型后再试",
+            ) from exc
 
     async def explain_query(
         self, sql: str, *, analyze: bool = False, client: str | None = None, user: str | None = None
@@ -165,6 +178,22 @@ class SecurityGateway:
             raise
         except AppError:
             raise
+        except Exception as exc:  # noqa: BLE001
+            duration = (time.monotonic() - start) * 1000
+            db_error = _db_error_detail(exc)
+            metrics.tool_calls.labels(tool="explain_query", connection=self.name, result="error").inc()
+            self._record(
+                tool="explain_query", sql=sql, rows=0, duration_ms=duration,
+                allowed=False, client=client, user=user,
+                detail={"detail": db_error, "error": "INTERNAL_ERROR"},
+            )
+            raise AppError(
+                "生成执行计划时发生内部错误",
+                code=ErrorCode.INTERNAL_ERROR,
+                connection=self.name,
+                detail=db_error,
+                hint="请检查 SQL 语法、表/列名与数据类型后再试",
+            ) from exc
 
     async def translate_sql(
         self,

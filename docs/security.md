@@ -6,7 +6,8 @@
    - 仅放行 `SELECT / WITH / EXPLAIN / SHOW`（`EXPLAIN` 需递归校验内部查询）。
    - 拒绝多语句、嵌套写入（CTE 中 INSERT 等）、事务控制、`SET`、`USE`、`CALL`、`COPY`、`SELECT INTO`。
    - 危险函数黑名单：`pg_read_file`、`pg_sleep`、`LOAD_FILE`、`sleep`、`benchmark`、`sys_eval` 等。
-   - 解析失败即拒绝（fail-closed）；客户端只收到通用拒绝信息，具体原因仅入审计。
+   - 解析失败即拒绝（fail-closed）；拒绝信息保持通用，规则编码经 `detail` 透出（如 `FORBIDDEN_ROOT:update`）。
+   - **DB 执行错误明细策略（v0.3 C-1）**：`execute_query` / `explain_query` 的数据库异常以「异常类型 + 单行消息」截断（≤300 字符）透出给 AI，便于模型自我修正（如 `UndefinedColumnError: column "foo" does not exist`）；原始完整堆栈与敏感值仍仅入审计日志。
 2. **资源限制**：自动 LIMIT（默认 100，最大 1000）、查询超时（默认 10s）、并发上限（默认 5）。
 3. **脱敏与排除**：`masked_columns` 打码为 `***`；`exclude_columns` / `exclude_tables` 从 schema 与结果中隐藏；敏感列名（password/token/secret/phone/id_card 等）自动打码；支持 `表名.列名` 限定与别名解析。
 4. **审计**：每次工具调用记录 ts/client/user/tool/connection/sql/rows/duration_ms/allowed，成功与拒绝均记录；webhook 失败不影响主流程。

@@ -10,7 +10,7 @@ import pytest
 
 from db_assistant_mcp.config import AuditConfig, ConnectionConfig, ServerConfig
 from db_assistant_mcp.drivers.base import DatabaseConnection
-from db_assistant_mcp.errors import QueryTimeoutError, SecurityRejectedError
+from db_assistant_mcp.errors import AppError, ErrorCode, QueryTimeoutError, SecurityRejectedError
 from db_assistant_mcp.security.audit import AuditLogger
 from db_assistant_mcp.security.gateway import SecurityGateway
 
@@ -59,6 +59,8 @@ class FakeConnection(DatabaseConnection):
         return {"tables": [], "columns": []}
 
     async def explain(self, sql: str, analyze: bool, timeout: float) -> dict[str, Any]:
+        if self.fail_with:
+            raise self.fail_with
         return {"format": "json", "analyze": analyze, "plan": {"Node Type": "Seq Scan"}}
 
 
@@ -207,3 +209,35 @@ async def test_audit_written_for_success_and_rejection(tmp_path):
     rej_entry = json.loads(lines[1])
     assert rej_entry["allowed"] is False
     assert rej_entry["detail"]["code"] == "SECURITY_REJECTED"
+
+
+@pytest.mark.asyncio
+async def test_db_error_detail_exposed_to_ai(tmp_path):
+    """C-1: execute_query 的数据库错误以「类型 + 消息」透出，供模型自纠。"""
+    audit_path = tmp_path / "audit.log"
+    fake = FakeConnection(fail_with=RuntimeError("syntax error at or near \"ORDER\""))
+    gw = _gateway(fake, audit_path)
+    with pytest.raises(AppError) as exc_info:
+        await gw.execute_query("SELECT * FROM broken ORDER")
+    assert exc_info.value.code == ErrorCode.INTERNAL_ERROR
+    assert exc_info.value.connection == "test"
+    assert exc_info.value.detail == 'RuntimeError: syntax error at or near "ORDER"'
+    assert "内部错误" in exc_info.value.message
+    assert exc_info.value.hint  # 提示模型检查语法/表列名/类型
+    # 同一明细也进审计
+    import json
+    entry = json.loads(audit_path.read_text(encoding="utf-8").strip().splitlines()[-1])
+    assert entry["allowed"] is False
+    assert entry["detail"]["detail"] == exc_info.value.detail
+    assert entry["detail"]["error"] == "INTERNAL_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_explain_db_error_wrapped_with_detail(tmp_path):
+    """C-1: explain_query 的数据库错误同样透出明细（此前仅 '工具内部错误'）。"""
+    fake = FakeConnection(fail_with=RuntimeError("column \"foo\" does not exist"))
+    gw = _gateway(fake, tmp_path / "audit.log")
+    with pytest.raises(AppError) as exc_info:
+        await gw.explain_query("SELECT foo FROM users")
+    assert exc_info.value.code == ErrorCode.INTERNAL_ERROR
+    assert exc_info.value.detail == 'RuntimeError: column "foo" does not exist'
