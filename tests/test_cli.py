@@ -35,10 +35,12 @@ def test_version():
 
 def test_version_flag_top_level():
     """T-5.1：db-assistant --version 与子命令 version 等价（PyPI 入口验收）。"""
+    from db_assistant_mcp import __version__
+
     result = _run("--version")
     assert result.exit_code == 0
     assert "db-assistant" in result.output
-    assert "0.2.0" in result.output
+    assert __version__ in result.output  # 动态断言，避免版本 bump 后 CI 失败
 
 
 def test_console_script_entry_points():
