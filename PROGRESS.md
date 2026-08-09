@@ -539,3 +539,5 @@
 
 | 2026-08-09 | 发布 v0.3.1：包含 C-2（search_schema 中文语义）、C-3（审计 stdout 协议防护）；bump 0.3.0→0.3.1，tag v0.3.1 推送，CI lint/integration/publish 全绿，PyPI 上线 0.3.1 | Codex |
 
+| 2026-08-09 | 新增 scripts/seed_demo.py：一键重建 Docker 演示库（PG/MySQL 各 users 5 / products 6+JSON specs / orders 10 / categories 10 / v_order_stats 视图），连接参数可用 DB_ASSISTANT_DEMO_* 环境变量覆盖，--skip-pg/--skip-mysql 可单独重建；修复 specs 填充时序（UPDATE 需在 INSERT 之后）；development.md 增演示数据小节 | Codex |
+

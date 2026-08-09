@@ -39,6 +39,13 @@ export DB_ASSISTANT_TEST_MYSQL_PASSWORD=test
 .venv/bin/python -m pytest -q
 ```
 
+## 演示数据
+
+```bash
+python scripts/seed_demo.py        # 重建 Docker PG/MySQL 演示库（users/products/orders/categories + JSON specs + 视图）
+python scripts/seed_demo.py --skip-pg
+```
+
 ## 代码检查
 
 ```bash
