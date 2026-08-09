@@ -19,6 +19,7 @@ class GlossaryTerm:
     meaning: str | None = None
     status: str = "approved"
     confidence: float | None = None
+    aliases: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -52,6 +53,7 @@ class Glossary:
                 meaning=item.get("meaning"),
                 status=item.get("status", "approved"),
                 confidence=item.get("confidence"),
+                aliases=[str(a).strip() for a in (item.get("aliases") or []) if str(a).strip()],
             )
             glossary.terms.append(term)
             if term.pattern:
@@ -79,14 +81,36 @@ class Glossary:
                 return term
         return None
 
+    @staticmethod
+    def _hit(term: GlossaryTerm, kw: str) -> bool:
+        """术语是否命中关键字：meaning 子串或别名双向子串。"""
+        if term.meaning and kw in term.meaning.lower():
+            return True
+        for alias in term.aliases:
+            alias_l = alias.lower()
+            if kw in alias_l or alias_l in kw:
+                return True
+        return False
+
     def search_terms(self, keyword: str) -> list[GlossaryTerm]:
-        """按语义词（meaning）匹配已审核术语，供 search_schema 命中中文语义。"""
+        """按语义词（meaning）或别名匹配已审核术语，供 search_schema 命中中文语义。"""
         kw = keyword.lower()
         matched: list[GlossaryTerm] = []
         for term in self.terms:
             if term.status not in ("approved", "reviewed"):
                 continue
-            if term.meaning and kw in term.meaning.lower():
+            if self._hit(term, kw):
+                matched.append(term)
+        return matched
+
+    def table_terms(self, keyword: str) -> list[GlossaryTerm]:
+        """表级术语（指定 table、无 column/pattern）按 meaning/别名命中，供 search_schema 命中表名。"""
+        kw = keyword.lower()
+        matched: list[GlossaryTerm] = []
+        for term in self.terms:
+            if term.status not in ("approved", "reviewed"):
+                continue
+            if term.table and not term.column and not term.pattern and self._hit(term, kw):
                 matched.append(term)
         return matched
 

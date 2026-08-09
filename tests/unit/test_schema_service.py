@@ -8,7 +8,7 @@ from db_assistant_mcp.config import ConnectionConfig
 from db_assistant_mcp.errors import TableNotFoundError
 from db_assistant_mcp.schema_service import SchemaService
 from db_assistant_mcp.security.redactor import Redactor
-from db_assistant_mcp.semantic import Glossary
+from db_assistant_mcp.semantic import Glossary, GlossaryTerm
 
 
 class FakeConn:
@@ -251,3 +251,27 @@ async def test_search_glossary_respects_redaction(tmp_path):
     service, _ = _search_service(tmp_path)
     assert await service.search("薪资") == {"keyword": "薪资", "tables": [], "columns": []}
     assert await service.search("salary") == {"keyword": "salary", "tables": [], "columns": []}
+
+
+@pytest.mark.asyncio
+async def test_search_matches_table_level_alias():
+    """D-3：表级术语按别名命中，把表本身加入结果，且不打到列。"""
+    service, _ = _service()
+    service._glossary.terms = [
+        GlossaryTerm(table="users", meaning="用户主表", aliases=["用户", "顾客"]),
+    ]
+    result = await service.search("顾客")
+    assert any(t["name"] == "users" for t in result["tables"])
+    assert result["columns"] == []
+
+
+@pytest.mark.asyncio
+async def test_search_matches_column_alias():
+    """D-3：列级术语按别名命中到具体列并附 meaning。"""
+    service, _ = _service()
+    service._glossary.terms = [
+        GlossaryTerm(column="id", meaning="主键", aliases=["标识"]),
+    ]
+    result = await service.search("标识")
+    assert any(c["table"] == "users" and c["column"] == "id" for c in result["columns"])
+    assert result["columns"][0].get("meaning") == "主键"

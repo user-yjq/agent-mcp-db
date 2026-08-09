@@ -309,6 +309,18 @@ meaning = "订单状态：pending/paid/shipped/completed/cancelled"
 # 正则匹配（优先级最低）
 pattern = ".*_status$"
 meaning = "状态字段，取值见对应枚举表"
+
+[[terms]]
+# 表级术语：search_schema 按语义/别名命中表本身（不落到列）
+table = "users"
+meaning = "用户主表（账号、联系方式与账号状态）"
+aliases = ["用户", "顾客", "会员", "客户"]
+
+[[terms]]
+# aliases：同义词，search_schema 支持双向子串命中（如搜「订单时间」）
+column = "user_order_dt"
+meaning = "下单时间（用户确认订单的时间）"
+aliases = ["下单时间", "订单时间"]
 ```
 
 ### 4.3 匹配优先级

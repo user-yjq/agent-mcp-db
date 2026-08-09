@@ -74,3 +74,35 @@ def test_term_matches_resolves_exact_and_pattern():
     assert g.term_matches(term_pattern, "products", "stock_status")
     assert not g.term_matches(term_pattern, "orders", "user_order_dt")
     assert not g.term_matches(GlossaryTerm(pattern="[", meaning="坏正则"), "t", "c")
+
+
+def test_aliases_loaded_and_searched():
+    """D-3：别名双向子串命中；表级术语单独命中表名。"""
+    g = Glossary()
+    g.terms = [
+        GlossaryTerm(table="users", meaning="用户主表", aliases=["用户", "顾客", "会员"]),
+        GlossaryTerm(column="user_order_dt", meaning="下单时间", aliases=["订单时间"]),
+    ]
+    assert any(t.table == "users" for t in g.search_terms("顾客"))
+    assert any(t.table == "users" for t in g.search_terms("用户列表"))  # 别名是关键字子串
+    assert any(t.column == "user_order_dt" for t in g.search_terms("订单时间"))
+    assert [t.table for t in g.table_terms("会员")] == ["users"]
+    assert g.table_terms("订单时间") == []  # 列级术语不进表级结果
+    g.terms.append(GlossaryTerm(table="secret", meaning="x", aliases=["机密"], status="pending_review"))
+    assert g.table_terms("机密") == []  # 未审核术语不参与
+
+
+def test_aliases_parsed_from_file(tmp_path):
+    p = tmp_path / "g.toml"
+    p.write_text(
+        '''
+[[terms]]
+column = "user_order_dt"
+meaning = "下单时间"
+aliases = ["下单时间", "订单时间"]
+''',
+        encoding="utf-8",
+    )
+    g = Glossary.load(str(p))
+    assert g.terms[0].aliases == ["下单时间", "订单时间"]
+    assert [t.column for t in g.search_terms("订单时间")] == ["user_order_dt"]

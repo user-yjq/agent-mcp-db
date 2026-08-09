@@ -332,13 +332,21 @@ path = "~/.config/db-assistant/audit.log"
 
 ```toml
 [[terms]]
+table = "users"
+meaning = "用户主表（账号、联系方式与账号状态）"
+aliases = ["用户", "顾客", "会员", "客户"]
+
+[[terms]]
 column = "user_order_dt"
 meaning = "下单时间（用户确认订单的时间）"
+aliases = ["下单时间", "订单时间"]
 
 [[terms]]
 pattern = ".*_status$"
 meaning = "状态字段，取值见对应枚举表"
 ```
+
+`aliases`：同义词列表，`search_schema` 支持 meaning 与别名双向子串命中；表级术语（只写 `table`）命中时把表本身加入结果。
 
 ---
 

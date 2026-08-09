@@ -159,8 +159,10 @@ class SchemaService:
                     if term and term.meaning:
                         entry["meaning"] = term.meaning
                     columns[(t["name"], c["name"])] = entry
-        # 2) 语义词命中：meaning 含关键字 → 解析到具体表/列（excluded 表/列天然被 summary 过滤）
+        # 2) 语义词命中：meaning/别名含关键字 → 解析到具体表/列（excluded 表/列天然被 summary 过滤）
         for term in self._glossary.search_terms(kw):
+            if term.table and not term.column and not term.pattern:
+                continue  # 表级术语由第 3 步统一处理（避免把表语义打到所有列上）
             for t in summary["tables"]:
                 for c in t["columns"]:
                     if self._glossary.term_matches(term, t["name"], c["name"]):
@@ -170,6 +172,12 @@ class SchemaService:
                         )
                         if term.meaning:
                             entry["meaning"] = term.meaning
+        # 3) 表级语义词命中：别名/语义命中时把表本身加入结果（如「用户/顾客/会员」→ users）
+        seen = {t["name"].lower() for t in tables}
+        for term in self._glossary.table_terms(kw):
+            if term.table and term.table.lower() not in seen:
+                tables.append({"name": term.table})
+                seen.add(term.table.lower())
         return {
             "keyword": keyword,
             "tables": tables[:50],

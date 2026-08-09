@@ -1,13 +1,22 @@
+# 示例业务词典：列名/表名 → 业务语义。search_schema 支持按 meaning 与 aliases（同义词）双向命中。
+
+[[terms]]
+table = "users"
+meaning = "用户主表（账号、联系方式与账号状态）"
+aliases = ["用户", "顾客", "会员", "客户"]
+
 [[terms]]
 column = "user_order_dt"
 meaning = "下单时间（用户确认订单的时间）"
+aliases = ["下单时间", "订单时间"]
 
 [[terms]]
 table = "orders"
 column = "order_status"
 meaning = "订单状态：pending/paid/shipped/completed/cancelled"
+aliases = ["订单状态", "状态"]
 
 [[terms]]
 pattern = ".*_?status$"  # 覆盖 status 与 order_status 等
 meaning = "状态字段，取值见对应枚举表"
-
+aliases = ["状态"]
