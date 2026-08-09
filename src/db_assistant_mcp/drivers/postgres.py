@@ -102,7 +102,9 @@ class PostgresConnection(DatabaseConnection):
     async def list_tables(self) -> list[dict[str, Any]]:
         sql = """
             SELECT t.tablename AS name,
-                   GREATEST(COALESCE(s.n_live_tup, 0), 0) AS estimated_rows
+                   GREATEST(COALESCE(s.n_live_tup, 0), 0) AS estimated_rows,
+                   obj_description((quote_ident(t.schemaname) || '.' || quote_ident(t.tablename))::regclass::oid)
+                     AS comment
             FROM pg_catalog.pg_tables t
             LEFT JOIN pg_catalog.pg_stat_user_tables s
               ON s.schemaname = t.schemaname AND s.relname = t.tablename
@@ -111,7 +113,7 @@ class PostgresConnection(DatabaseConnection):
         """
         rows = await self._conn.fetch(sql)  # type: ignore[union-attr]
         return [
-            {"name": r["name"], "estimated_rows": int(r["estimated_rows"]), "comment": None}
+            {"name": r["name"], "estimated_rows": int(r["estimated_rows"]), "comment": r["comment"]}
             for r in rows
         ]
 

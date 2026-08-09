@@ -46,6 +46,9 @@ python scripts/seed_demo.py        # 重建 Docker PG/MySQL 演示库（users/pr
 python scripts/seed_demo.py --skip-pg
 ```
 
+演示库带表/列中文注释（PG `COMMENT ON ...`，MySQL DDL `COMMENT` 子句），
+用于验证 schema 注释读取链路（`list_tables` / `table_schema` / `get_table_schema` 工具）。
+
 ## 代码检查
 
 ```bash

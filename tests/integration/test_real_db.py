@@ -134,3 +134,46 @@ async def test_mysql_explain_tree_or_text():
         assert summary["note"] is not None or summary["tables"]
     finally:
         await conn.close()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_postgres_table_comments():
+    """D-1 集成：PG 表/列注释经 list_tables / table_schema 透出（演示库 seed 后）。"""
+    cfg = _pg_config()
+    if cfg is None:
+        pytest.skip("未设置 DB_ASSISTANT_TEST_PG_*")
+    conn = PostgresConnection(cfg)
+    await conn.connect()
+    try:
+        tables = await conn.list_tables()
+        users = next((t for t in tables if t["name"] == "users"), None)
+        if users is None:
+            pytest.skip("演示库未初始化（请先运行 scripts/seed_demo.py）")
+        assert users["comment"] and "用户主表" in users["comment"]
+        orders = await conn.table_schema("orders")
+        assert orders["comment"] and "订单表" in orders["comment"]
+        order_status = next(c for c in orders["columns"] if c["name"] == "order_status")
+        assert order_status["comment"] and "订单状态" in order_status["comment"]
+    finally:
+        await conn.close()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_table_comments():
+    """D-1 集成：MySQL 表/列注释经 table_schema 透出（演示库 seed 后）。"""
+    cfg = _mysql_config()
+    if cfg is None:
+        pytest.skip("未设置 DB_ASSISTANT_TEST_MYSQL_*")
+    conn = MysqlConnection(cfg)
+    await conn.connect()
+    try:
+        schema = await conn.table_schema("users")
+        if not schema["columns"]:
+            pytest.skip("演示库未初始化（请先运行 scripts/seed_demo.py）")
+        assert schema["comment"] and "用户主表" in schema["comment"]
+        status_col = next(c for c in schema["columns"] if c["name"] == "status")
+        assert status_col["comment"] and "账号状态" in status_col["comment"]
+    finally:
+        await conn.close()

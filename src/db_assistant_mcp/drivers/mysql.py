@@ -149,6 +149,14 @@ class MysqlConnection(DatabaseConnection):
                 (table,),
             )
             fk_rows = await cur.fetchall()
+            await cur.execute(
+                """
+                SELECT TABLE_COMMENT FROM information_schema.TABLES
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s
+                """,
+                (table,),
+            )
+            comment_row = await cur.fetchone()
         columns = [
             {
                 "name": r[0],
@@ -172,7 +180,7 @@ class MysqlConnection(DatabaseConnection):
         return {
             "table": table,
             "schema": None,
-            "comment": None,
+            "comment": (comment_row[0] or None) if comment_row else None,
             "columns": columns,
             "indexes": indexes,
             "foreign_keys": foreign_keys,

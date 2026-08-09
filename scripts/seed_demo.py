@@ -109,6 +109,15 @@ SELECT u.id AS user_id, u.name AS user_name,
        round(avg(o.total_amount), 2) AS avg_order
 FROM users u LEFT JOIN orders o ON o.user_id = u.id
 GROUP BY u.id, u.name;
+
+COMMENT ON TABLE users IS '用户主表：账号、联系方式与账号状态';
+COMMENT ON TABLE products IS '商品表：价格、库存与 JSON 规格（颜色/尺寸/保修）';
+COMMENT ON TABLE orders IS '订单表：下单用户、商品、数量、金额与订单状态';
+COMMENT ON TABLE categories IS '分类表：自引用树形结构（parent_id 指向自身 id）';
+COMMENT ON VIEW v_order_stats IS '订单统计视图：每用户的订单数、总消费与客单价';
+COMMENT ON COLUMN users.status IS '账号状态：active=正常 / inactive=停用';
+COMMENT ON COLUMN products.specs IS '商品规格 JSON：color/dimensions/warranty_months';
+COMMENT ON COLUMN orders.order_status IS '订单状态：pending/paid/shipped/completed/cancelled';
 """
 
 MYSQL_DDL = """
@@ -118,35 +127,35 @@ CREATE TABLE users (
   name VARCHAR(100) NOT NULL,
   email VARCHAR(200) NOT NULL,
   phone VARCHAR(20),
-  status VARCHAR(20) NOT NULL DEFAULT 'active',
+  status VARCHAR(20) NOT NULL DEFAULT 'active' COMMENT '账号状态: active/inactive',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+) COMMENT='用户主表：账号、联系方式与账号状态';
 CREATE TABLE products (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   price DECIMAL(10,2) NOT NULL,
   stock INT NOT NULL DEFAULT 0,
   status VARCHAR(20) NOT NULL DEFAULT 'on_sale',
-  specs JSON
-);
+  specs JSON COMMENT '商品规格 JSON：color/dimensions/warranty_months'
+) COMMENT='商品表：价格、库存与 JSON 规格';
 CREATE TABLE orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   product_id INT NOT NULL,
   quantity INT NOT NULL,
   total_amount DECIMAL(10,2) NOT NULL,
-  order_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  order_status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '订单状态：pending/paid/shipped/completed/cancelled',
   user_order_dt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id),
   CONSTRAINT fk_product FOREIGN KEY (product_id) REFERENCES products(id)
-);
+) COMMENT='订单表：下单用户、商品、数量、金额与订单状态';
 CREATE TABLE categories (
   id INT AUTO_INCREMENT PRIMARY KEY,
   parent_id INT NULL,
   name VARCHAR(100) NOT NULL,
   sort_order INT NOT NULL DEFAULT 0,
   CONSTRAINT fk_parent FOREIGN KEY (parent_id) REFERENCES categories(id)
-);
+) COMMENT='分类表：自引用树形结构（parent_id 指向自身 id）';
 CREATE OR REPLACE VIEW v_order_stats AS
 SELECT u.id AS user_id, u.name AS user_name,
        count(o.id) AS order_count,
