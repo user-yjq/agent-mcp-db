@@ -101,19 +101,30 @@ class PostgresConnection(DatabaseConnection):
 
     async def list_tables(self) -> list[dict[str, Any]]:
         sql = """
-            SELECT t.tablename AS name,
+            SELECT c.relname AS name,
                    GREATEST(COALESCE(s.n_live_tup, 0), 0) AS estimated_rows,
-                   obj_description((quote_ident(t.schemaname) || '.' || quote_ident(t.tablename))::regclass::oid)
-                     AS comment
-            FROM pg_catalog.pg_tables t
+                   obj_description(c.oid) AS comment,
+                   CASE c.relkind
+                     WHEN 'r' THEN 'table'
+                     WHEN 'p' THEN 'table'
+                     WHEN 'v' THEN 'view'
+                   END AS kind
+            FROM pg_catalog.pg_class c
+            JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
             LEFT JOIN pg_catalog.pg_stat_user_tables s
-              ON s.schemaname = t.schemaname AND s.relname = t.tablename
-            WHERE t.schemaname NOT IN ('pg_catalog', 'information_schema')
-            ORDER BY t.tablename
+              ON s.schemaname = n.nspname AND s.relname = c.relname
+            WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+              AND c.relkind IN ('r', 'p', 'v')
+            ORDER BY c.relname
         """
         rows = await self._conn.fetch(sql)  # type: ignore[union-attr]
         return [
-            {"name": r["name"], "estimated_rows": int(r["estimated_rows"]), "comment": r["comment"]}
+            {
+                "name": r["name"],
+                "estimated_rows": int(r["estimated_rows"]),
+                "comment": r["comment"],
+                "kind": r["kind"],
+            }
             for r in rows
         ]
 

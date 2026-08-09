@@ -14,7 +14,7 @@ def register(registry: RuntimeRegistry) -> dict[str, object]:
 
     @tool_handler(registry, "list_tables")
     async def list_tables(connection: str) -> dict:
-        """列出指定连接下的表名与行数估算。connection: 配置中的连接名。"""
+        """列出指定连接下的表/视图与行数估算（kind 区分 table/view）。connection: 配置中的连接名。"""
         runtime = registry.get(connection)
         tables = await runtime.schema.list_tables()
         return {"connection": connection, "tables": tables, "table_count": len(tables)}

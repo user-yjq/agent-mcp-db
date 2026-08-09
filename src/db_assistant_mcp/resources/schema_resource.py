@@ -22,7 +22,7 @@ def register(registry: RuntimeRegistry) -> dict[str, object]:
         return _dump(summary)
 
     async def tables_resource(name: str) -> str:
-        """表列表与行数估算。"""
+        """表/视图列表与行数估算。"""
         if name not in registry.names:
             raise ResourceNotFoundError(f"资源不存在: db://{name}/tables", detail="RESOURCE_NOT_FOUND")
         runtime = registry.get(name)

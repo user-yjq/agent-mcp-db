@@ -177,3 +177,78 @@ async def test_mysql_table_comments():
         assert status_col["comment"] and "账号状态" in status_col["comment"]
     finally:
         await conn.close()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_postgres_views_and_complex_structures():
+    """D-2 集成：PG list_tables 暴露视图；JSON / 递归 CTE / 视图可直查。"""
+    cfg = _pg_config()
+    if cfg is None:
+        pytest.skip("未设置 DB_ASSISTANT_TEST_PG_*")
+    conn = PostgresConnection(cfg)
+    await conn.connect()
+    try:
+        tables = await conn.list_tables()
+        view = next((t for t in tables if t["name"] == "v_order_stats"), None)
+        if view is None:
+            pytest.skip("演示库未初始化（请先运行 scripts/seed_demo.py）")
+        assert view["kind"] == "view"
+        assert "users" in [t["name"] for t in tables]
+
+        _, rows = await conn.fetch(
+            "SELECT name FROM products WHERE specs->>'color' = '黑' ORDER BY name", timeout=10
+        )
+        assert len(rows) >= 1
+
+        _, rows = await conn.fetch(
+            "WITH RECURSIVE tree AS ("
+            "SELECT id, parent_id FROM categories WHERE parent_id IS NULL "
+            "UNION ALL "
+            "SELECT c.id, c.parent_id FROM categories c JOIN tree t ON c.parent_id = t.id"
+            ") SELECT count(*) AS n FROM tree",
+            timeout=10,
+        )
+        assert rows[0][0] == 10
+
+        view_schema = await conn.table_schema("v_order_stats")
+        assert any(c["name"] == "total_spent" for c in view_schema["columns"])
+    finally:
+        await conn.close()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_views_and_complex_structures():
+    """D-2 集成：MySQL list_tables 暴露视图；JSON / 递归 CTE / 视图可直查。"""
+    cfg = _mysql_config()
+    if cfg is None:
+        pytest.skip("未设置 DB_ASSISTANT_TEST_MYSQL_*")
+    conn = MysqlConnection(cfg)
+    await conn.connect()
+    try:
+        tables = await conn.list_tables()
+        view = next((t for t in tables if t["name"] == "v_order_stats"), None)
+        if view is None:
+            pytest.skip("演示库未初始化（请先运行 scripts/seed_demo.py）")
+        assert view["kind"] == "view"
+
+        _, rows = await conn.fetch(
+            "SELECT name FROM products WHERE JSON_EXTRACT(specs, '$.color') = '黑' ORDER BY name", timeout=10
+        )
+        assert len(rows) >= 1
+
+        _, rows = await conn.fetch(
+            "WITH RECURSIVE tree AS ("
+            "SELECT id, parent_id FROM categories WHERE parent_id IS NULL "
+            "UNION ALL "
+            "SELECT c.id, c.parent_id FROM categories c JOIN tree t ON c.parent_id = t.id"
+            ") SELECT count(*) AS n FROM tree",
+            timeout=10,
+        )
+        assert rows[0][0] == 10
+
+        view_schema = await conn.table_schema("v_order_stats")
+        assert any(c["name"] == "total_spent" for c in view_schema["columns"])
+    finally:
+        await conn.close()

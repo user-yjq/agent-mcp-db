@@ -482,7 +482,7 @@
 | ID | 任务 | 优先级 | 状态 |
 |---|---|---|---|
 | D-1 | 表注释读取补齐：PG `list_tables` 读 `obj_description`；MySQL `table_schema` 读 `TABLE_COMMENT`；演示库 seed 增加表/列注释；CI 集成 job 先跑 seed 再测试 | P0 | ✅ 已完成（2026-08-09，见下方更新日志） |
-| D-2 | 复杂查询能力盘点补齐：用演示库实测 JSON / 视图 / 递归 CTE 在双库全链路可用，缺口逐个修复并加回归 | P1 | ⬜ 待启动 |
+| D-2 | 复杂查询能力盘点补齐：用演示库实测 JSON / 视图 / 递归 CTE 在双库全链路可用，缺口逐个修复并加回归 | P1 | ✅ 已完成（2026-08-09，见下方更新日志） |
 | D-3 | glossary 增强：词条别名/同义词支持（如「用户」↔「顾客」） | P2 | ⬜ 待启动 |
 
 详细任务清单见 [plan_v0.4.md](./plan/plan_v0.4.md)。
@@ -552,5 +552,6 @@
 | 2026-08-09 | 发布 v0.3.1：包含 C-2（search_schema 中文语义）、C-3（审计 stdout 协议防护）；bump 0.3.0→0.3.1，tag v0.3.1 推送，CI lint/integration/publish 全绿，PyPI 上线 0.3.1 | Codex |
 
 | 2026-08-09 | 新增 scripts/seed_demo.py：一键重建 Docker 演示库（PG/MySQL 各 users 5 / products 6+JSON specs / orders 10 / categories 10 / v_order_stats 视图），连接参数可用 DB_ASSISTANT_DEMO_* 环境变量覆盖，--skip-pg/--skip-mysql 可单独重建；修复 specs 填充时序（UPDATE 需在 INSERT 之后）；development.md 增演示数据小节 | Codex |
+| 2026-08-09 | v0.4 D-2 复杂查询能力盘点补齐：真库全链路实测 10 类复杂结构查询（PG `?`/`->>`/`@>`，MySQL `JSON_EXTRACT`/`->>`/`JSON_CONTAINS`，双方言视图与递归 CTE）全部可直查；修复 `list_tables` 双方言此前只列 BASE TABLE 导致视图（如 v_order_stats）对 AI 不可见——PG 改为 pg_class（relkind r/p/v）取数、MySQL 改为 TABLE_TYPE IN ('BASE TABLE','VIEW')，并透出 kind（table/view）；新增 validator 复杂结构放行单测（双方言兼容 5 例 + PG 专属 `?`/`@>` 与 MySQL fail-closed 4 断言）与真库集成测试（PG/MySQL 视图发现 + JSON/递归 CTE/视图直查）；本地全量 **426 passed / 26 skipped / 0 failed**（沙箱外）+ 双库集成 9 passed，ruff 全过；未 bump 版本，待 D-3 完成后随 v0.4 发布 | Codex |
 | 2026-08-09 | v0.4 D-1 表注释读取补齐：PG `list_tables` 改读 `obj_description`（此前 comment 恒为 None）、MySQL `table_schema` 改读 `TABLE_COMMENT`（此前写死 None）；seed_demo.py 为双库演示表/列补充中文注释（表 4+1 视图、列 3），CI 集成 job 新增 seed 步骤；新增集成测试 test_postgres_table_comments / test_mysql_table_comments（真库断言注释透出）；本地全量 **415 passed / 24 skipped / 0 failed**（沙箱外）+ 双库集成 7 passed，ruff 全过；未 bump 版本，待 D-2/D-3 完成后随 v0.4 发布 | Codex |
 

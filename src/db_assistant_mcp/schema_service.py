@@ -68,6 +68,7 @@ class SchemaService:
                     "name": t["name"],
                     "estimated_rows": t.get("estimated_rows"),
                     "comment": t.get("comment"),
+                    "kind": t.get("kind"),
                     "columns": columns,
                     "indexes": schema.get("indexes", []),
                     "foreign_keys": schema.get("foreign_keys", []),
@@ -106,6 +107,7 @@ class SchemaService:
                 "name": t["name"],
                 "estimated_rows": t["estimated_rows"],
                 "comment": t["comment"],
+                "kind": t.get("kind"),
             }
             for t in summary["tables"]
         ]

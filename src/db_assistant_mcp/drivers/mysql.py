@@ -111,15 +111,20 @@ class MysqlConnection(DatabaseConnection):
         async with self._conn.cursor() as cur:
             await cur.execute(
                 """
-                SELECT TABLE_NAME, TABLE_ROWS, TABLE_COMMENT
+                SELECT TABLE_NAME, TABLE_ROWS, TABLE_COMMENT, TABLE_TYPE
                 FROM information_schema.TABLES
-                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE IN ('BASE TABLE', 'VIEW')
                 ORDER BY TABLE_NAME
                 """
             )
             rows = await cur.fetchall()
         return [
-            {"name": r[0], "estimated_rows": int(r[1] or 0), "comment": r[2] or None}
+            {
+                "name": r[0],
+                "estimated_rows": int(r[1] or 0),
+                "comment": r[2] or None,
+                "kind": "view" if r[3] == "VIEW" else "table",
+            }
             for r in rows
         ]
 

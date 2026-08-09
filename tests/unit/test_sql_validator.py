@@ -86,6 +86,36 @@ def test_set_ops_with_write_still_rejected(validator):
     assert not validator.validate("SELECT 1 UNION SELECT pg_sleep(1)").ok
 
 
+@pytest.mark.parametrize(
+    "sql",
+    [
+        # D-2 复杂结构（双方言兼容子集）：JSON 取值 / 递归 CTE / 视图
+        "SELECT specs->>'color' AS color FROM products",
+        "SELECT JSON_EXTRACT(specs, '$.color') AS color FROM products",
+        "SELECT name FROM products WHERE JSON_CONTAINS(specs, '\"黑\"', '$.color')",
+        "SELECT * FROM v_order_stats",
+        "WITH RECURSIVE tree AS ("
+        "SELECT id FROM categories WHERE parent_id IS NULL "
+        "UNION ALL "
+        "SELECT c.id FROM categories c JOIN tree t ON c.parent_id = t.id"
+        ") SELECT * FROM tree",
+    ],
+)
+def test_complex_structures_allowed_both_dialects(validator, sql):
+    """D-2：JSON / 视图 / 递归 CTE 在双方言下均放行。"""
+    assert validator.validate(sql).ok
+
+
+def test_dialect_specific_json_operators():
+    """D-2：PG 专属 JSON 操作符放行；MySQL 不支持的 @> 被 fail-closed 拒绝。"""
+    pg = SqlValidator("postgres")
+    assert pg.validate("SELECT name FROM products WHERE specs ? 'color'").ok
+    assert pg.validate("SELECT name FROM products WHERE specs @> '{\"color\":\"黑\"}'").ok
+    my = SqlValidator("mysql")
+    assert my.validate("SELECT specs->>'$.color' AS color FROM products").ok
+    assert not my.validate("SELECT specs @> '{}' FROM products").ok
+
+
 def test_sql_too_long(validator):
     assert not validator.validate("SELECT 1 " * 30_000).ok
 

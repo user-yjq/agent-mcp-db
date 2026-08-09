@@ -154,7 +154,7 @@ sequenceDiagram
 | 工具名 | 关键参数 | 返回 | 用途 |
 |---|---|---|---|
 | `list_databases` | 无 | 数据库/连接列表 | 让 AI 知道可用数据源 |
-| `list_tables` | database, schema? | 表名 + 行数估算 | 浏览库结构 |
+| `list_tables` | database | 表/视图名 + 行数估算 + 注释 + kind | 浏览库结构（含视图） |
 | `get_table_schema` | database, table | 列/类型/主外键/索引/注释 | 写 SQL 前的核心上下文 |
 | `search_schema` | keyword | 匹配的表/列（含 glossary 语义词与 meaning） | 模糊搜索 + 中文语义命中，开发高频操作 |
 | `execute_query` | sql, limit? | 行数据 + 列信息 | 只读执行 SELECT |
