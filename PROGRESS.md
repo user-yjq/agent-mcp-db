@@ -537,3 +537,5 @@
 
 | 2026-08-09 | v0.3 C-3 审计 stdout 协议污染防护：新增 `[audit] output = "stderr"`（VALID_AUDIT_OUTPUTS 扩充 + AuditLogger._write_stderr）；`create_server` 在 stdio 模式（host=None）下检测到 `output=stdout` 自动降级为 stderr 并记告警，HTTP 模式不受影响，保护 JSON-RPC 协议流；新增 tests/unit/test_audit.py（stderr 输出 1 例）、test_config.py（stderr 合法/非法 output 2 例）、tests/integration/test_reconnect_e2e.py（stdio 降级 e2e 1 例：stdout 干净 + 审计落 stderr）；config.example/admin-guide/mcp_db 同步 | Codex |
 
+| 2026-08-09 | 发布 v0.3.1：包含 C-2（search_schema 中文语义）、C-3（审计 stdout 协议防护）；bump 0.3.0→0.3.1，tag v0.3.1 推送，CI lint/integration/publish 全绿，PyPI 上线 0.3.1 | Codex |
+
