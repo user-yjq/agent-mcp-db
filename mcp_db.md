@@ -258,7 +258,7 @@ db-assistant remove main-prod
 }
 ```
 
-审计日志支持输出到文件、stdout 或 webhook（已实现，v0.1）。
+审计日志支持输出到文件、stdout、stderr 或 webhook（已实现，v0.1；C-3 起 stdio 模式下 stdout 自动降级 stderr，保护 JSON-RPC 协议流）。
 
 ### 6.7 威胁模型（摘要）
 
@@ -324,7 +324,7 @@ glossary_file = "glossary.toml"
 templates_dir = "templates/"
 
 [audit]
-output = "file"             # file | stdout | webhook
+output = "file"             # file | stdout | stderr | webhook（stdio 下 stdout 自动降级 stderr）
 path = "~/.config/db-assistant/audit.log"
 ```
 

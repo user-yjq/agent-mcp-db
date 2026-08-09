@@ -92,7 +92,7 @@ glossary_file = "glossary.toml"
 templates_dir = "templates/"
 
 [audit]
-output = "file"             # file | stdout | webhook
+output = "file"             # file | stdout | stderr | webhook（stdio 下 stdout 自动降级 stderr）
 path = "~/.config/db-assistant/audit.log"
 
 [metrics]
@@ -379,6 +379,11 @@ flowchart TD
 ---
 
 ## 5. 审计日志
+
+> **stdio 模式提示（C-3）**：MCP stdio 传输下 stdout 专用于 JSON-RPC 协议流，
+> 配置 `output = "stdout"` 会被自动降级为 `stderr`（启动日志有告警），
+> 避免审计输出污染协议导致客户端解析失败；HTTP 模式不受影响。
+
 
 ### 5.1 日志格式
 

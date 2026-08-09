@@ -36,7 +36,7 @@ templates_dir = "config/templates/"
 # candidate_file = "config/glossary.candidate.toml"  # 默认与 glossary 同目录
 
 [audit]
-output = "file"               # file | stdout | webhook
+output = "file"               # file | stdout | stderr | webhook（stdio 模式下 stdout 自动降级 stderr，保护协议流）
 path = "~/.config/db-assistant/audit.log"
 
 [metrics]

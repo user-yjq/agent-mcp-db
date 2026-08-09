@@ -143,3 +143,17 @@ async def test_execute_query_returns_structured_error_when_reconnect_fails(tmp_p
     assert len(entries) == 1
     assert entries[0]["tool"] == "execute_query"
     assert entries[0]["allowed"] is False
+
+
+@pytest.mark.asyncio
+async def test_audit_stdout_downgraded_to_stderr_in_stdio(tmp_path, capsys):
+    """C-3: stdio 模式下 audit output=stdout 自动降级 stderr，stdout 协议流不被污染。"""
+    mcp = _build_server(tmp_path, audit_output="stdout")
+    _patch_pool(mcp, first_fails=False)
+
+    result = await mcp.call_tool("execute_query", {"connection": "demo", "sql": "SELECT 1"})
+    assert json.loads(result[0].text)["row_count"] == 1
+
+    captured = capsys.readouterr()
+    assert captured.out == ""  # stdout 干净：只有 JSON-RPC 协议流
+    assert "allowed" in captured.err  # 审计实际写入 stderr

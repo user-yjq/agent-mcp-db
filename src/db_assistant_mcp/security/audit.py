@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -60,6 +61,10 @@ class AuditLogger:
     def _write_stdout(self, entry: dict[str, Any]) -> None:
         print(json.dumps(entry, ensure_ascii=False))
 
+    def _write_stderr(self, entry: dict[str, Any]) -> None:
+        """stderr 输出：MCP stdio 模式下 stdout 保留给 JSON-RPC，审计走 stderr。"""
+        print(json.dumps(entry, ensure_ascii=False), file=sys.stderr)
+
     async def _write_webhook(self, entry: dict[str, Any]) -> None:
         url = self._config.webhook_url
         if not url:
@@ -86,6 +91,8 @@ class AuditLogger:
         try:
             if self._config.output == "stdout":
                 self._write_stdout(entry)
+            elif self._config.output == "stderr":
+                self._write_stderr(entry)
             elif self._config.output == "webhook":
                 try:
                     loop = asyncio.get_running_loop()

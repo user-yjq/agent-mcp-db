@@ -222,3 +222,35 @@ def test_load_config_warns_on_permissive_permissions(tmp_path):
     os.chmod(path, 0o644)
     with pytest.warns(RuntimeWarning, match="权限过宽"):
         load_config(str(path))
+
+def test_audit_output_stderr_valid(tmp_path):
+    path = _write(
+        tmp_path,
+        """
+[connections.pg]
+type = "postgres"
+host = "localhost"
+database = "orders"
+user = "svc"
+[audit]
+output = "stderr"
+""",
+    )
+    assert load_config(path).audit.output == "stderr"
+
+
+def test_audit_output_invalid(tmp_path):
+    path = _write(
+        tmp_path,
+        """
+[connections.pg]
+type = "postgres"
+host = "localhost"
+database = "orders"
+user = "svc"
+[audit]
+output = "logstash"
+""",
+    )
+    with pytest.raises(ConfigError):
+        load_config(path)

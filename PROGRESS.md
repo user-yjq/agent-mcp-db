@@ -474,7 +474,7 @@
 |---|---|---|---|
 | C-1 | 数据库错误明细透出给 AI（`to_dict` 截断透出 detail；execute_query/explain_query DB 异常包装为「类型+单行消息」+ 自纠 hint；审计同步） | P0 | ✅ 已完成（2026-08-07，见下方更新日志） |
 | C-2 | `search_schema` 接入 glossary 中文语义（含 pattern 匹配） | P1 | ✅ 已完成（2026-08-07，见下方更新日志） |
-| C-3 | 审计 stdout 模式在 stdio 传输下的协议污染防护 | P2 | ⬜ 待办 |
+| C-3 | 审计 stdout 模式在 stdio 传输下的协议污染防护 | P2 | ✅ 已完成（2026-08-09，见下方更新日志） |
 
 详细任务清单见 [plan_v0.3.md](./plan/plan_v0.3.md)。
 
@@ -534,4 +534,6 @@
 | 2026-08-07 | v0.3 C-1 数据库错误明细透出给 AI（Codex 实测反馈）：`AppError.to_dict()` 截断透出 detail（`AI_DETAIL_MAX=300`，无 detail 字段缺省），DB 异常包装为「类型 + 单行消息」；`execute_query` 与 `explain_query` 的通用异常分支统一转 `INTERNAL_ERROR` 并带 `detail` + 自纠 hint（此前 explain 的 DB 错误只回"工具内部错误"）；审计同步记录同明细；安全回归保持：SecurityRejectedError message 通用不暴露原始语句、规则编码经 detail 透出、excluded 表名不泄露；实测坏 SQL 返回 `DatatypeMismatchError: recursive query "tree" column 5 ...`、explain 返回 `UndefinedColumnError: column "foo" does not exist`；新增/更新 tests/unit/test_errors.py（3 例）、test_gateway.py（2 例）、test_sql_validator.py（1 例）；全量 **408 collected，exit 0**，ruff 全过 | Codex |
 
 | 2026-08-07 | v0.3 C-2 `search_schema` 接入 glossary：`Glossary.search_terms`（按 meaning 命中已审核术语）+ `term_matches`（精确表列/精确列/pattern 正则展开）；`SchemaService.search` 合并「表/列名子串命中（附 meaning）」与「语义词命中（解析到具体表/列）」，excluded 表/列天然被 summary 过滤不泄露；实测「订单/状态/时间」均命中 orders.order_status、user_order_dt 与各 *_status 列并附 meaning；示例词典 pattern 放宽为 `.*_?status$` 覆盖裸 status；新增 tests/unit/test_semantic.py 2 例 + test_schema_service.py 4 例；README/mcp_db 工具表同步 | Codex |
+
+| 2026-08-09 | v0.3 C-3 审计 stdout 协议污染防护：新增 `[audit] output = "stderr"`（VALID_AUDIT_OUTPUTS 扩充 + AuditLogger._write_stderr）；`create_server` 在 stdio 模式（host=None）下检测到 `output=stdout` 自动降级为 stderr 并记告警，HTTP 模式不受影响，保护 JSON-RPC 协议流；新增 tests/unit/test_audit.py（stderr 输出 1 例）、test_config.py（stderr 合法/非法 output 2 例）、tests/integration/test_reconnect_e2e.py（stdio 降级 e2e 1 例：stdout 干净 + 审计落 stderr）；config.example/admin-guide/mcp_db 同步 | Codex |
 

@@ -19,7 +19,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response
 
-from db_assistant_mcp.config import AppConfig, HttpConfig, load_config
+from db_assistant_mcp.config import AppConfig, AuditConfig, HttpConfig, load_config
 from db_assistant_mcp.logging_utils import get_logger, log_context
 from db_assistant_mcp.observability.http_server import start_http_server
 from db_assistant_mcp.resources.schema_resource import register as register_resources
@@ -40,7 +40,20 @@ logger = get_logger("db_assistant_mcp.server")
 
 def create_server(app_config: AppConfig, *, host: str | None = None, port: int | None = None) -> FastMCP:
     """装配 MCP Server（stdio/HTTP 共用）。host/port 仅影响 streamable-http 模式。"""
-    audit = AuditLogger(app_config.audit)
+    audit_config = app_config.audit
+    if host is None and audit_config.output == "stdout":
+        # C-3：stdio 传输下 stdout 是 JSON-RPC 协议流，审计降级到 stderr 防止污染
+        log_context(
+            logger, 30,
+            "stdio 模式下 [audit] output=stdout 已降级为 stderr（保护 JSON-RPC 协议流）",
+        )
+        audit_config = AuditConfig(
+            output="stderr",
+            path=audit_config.path,
+            webhook_url=audit_config.webhook_url,
+            webhook_secret_env=audit_config.webhook_secret_env,
+        )
+    audit = AuditLogger(audit_config)
     glossary = Glossary.load(app_config.semantic.glossary_file)
     registry = RuntimeRegistry(app_config, audit, glossary)
 

@@ -18,7 +18,7 @@ ENV_REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 VALID_TYPES = {"postgres", "mysql"}
 VALID_MODES = {"read_only", "safe_write", "full"}
-VALID_AUDIT_OUTPUTS = {"file", "stdout", "webhook"}
+VALID_AUDIT_OUTPUTS = {"file", "stdout", "stderr", "webhook"}
 
 
 @dataclass

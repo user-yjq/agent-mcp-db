@@ -47,6 +47,15 @@ def test_stdout_output(tmp_path, capsys):
     assert json.loads(captured)["tool"] == "ping"
 
 
+def test_stderr_output(tmp_path, capsys):
+    """C-3: output=stderr 写 stderr，不碰 stdout。"""
+    audit = _audit(tmp_path, output="stderr")
+    audit.record(tool="ping", connection=None, sql=None, rows=0, duration_ms=1, allowed=True)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert json.loads(captured.err.strip())["tool"] == "ping"
+
+
 def test_webhook_unreachable_does_not_raise(tmp_path):
     audit = _audit(tmp_path, output="webhook", webhook_url="http://127.0.0.1:1/nope")
     audit.record(tool="execute_query", connection="c", sql="SELECT 1", rows=0,
