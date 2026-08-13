@@ -294,7 +294,7 @@ db-assistant remove main-prod
 
 ```toml
 [server]
-mode = "read_only"          # read_only | safe_write | full
+mode = "read_only"          # v1 仅实现 read_only；safe_write/full 为规划中的写模式，配置即拒绝
 default_limit = 100
 query_timeout_sec = 10
 max_concurrent = 5
@@ -317,7 +317,7 @@ port = 3306
 database = "app"
 user = "root"
 password_env = "MYSQL_LOCAL_PASSWORD"
-mode = "full"               # 仅本地开发库
+mode = "read_only"          # v1 强制只读；写模式规划中
 
 [semantic]
 glossary_file = "glossary.toml"

@@ -1,0 +1,37 @@
+# Codex 接入示例配置（只连 docker-compose 测试库，见 docker-compose.yml）
+# 密码仅经环境变量注入（值不落盘）；生产环境请基于 config.example.toml 新建配置
+[server]
+mode = "read_only"
+default_limit = 100
+query_timeout_sec = 10
+max_concurrent = 5
+schema_cache_ttl_sec = 300
+
+[connections.codex-pg]
+type = "postgres"
+host = "127.0.0.1"
+port = 54329
+database = "testdb"
+user = "test"
+password_env = "DB_ASSISTANT_CODEX_PG_PASSWORD"
+masked_columns = ["phone", "email"]
+
+[connections.codex-mysql]
+type = "mysql"
+host = "127.0.0.1"
+port = 33069
+database = "testdb"
+user = "root"
+password_env = "DB_ASSISTANT_CODEX_MYSQL_PASSWORD"
+masked_columns = ["phone", "email"]
+charset = "utf8mb4"
+
+[semantic]
+glossary_file = "/opt/db-assistant/config/glossary.example.toml"
+
+[audit]
+output = "file"
+path = "/opt/db-assistant/audit.log"
+
+[metrics]
+enabled = false

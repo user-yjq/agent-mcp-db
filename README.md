@@ -50,6 +50,9 @@ python -m db_assistant_mcp
 }
 ```
 
+Codex、Cursor、Claude Desktop 的完整接入配置与实测说明见
+[客户端兼容性](docs/client-compat.md)，可直接粘贴的示例文件在 `config/examples/`。
+
 ## 工具
 
 | 工具 | 说明 |
@@ -78,6 +81,7 @@ python -m db_assistant_mcp
 ## 文档
 
 - [协议设计](mcp_db.md)
+- [客户端兼容性](docs/client-compat.md)
 - [管理员手册](admin-guide.md)
 - [开发进度](PROGRESS.md)
 - [开发文档](docs/)

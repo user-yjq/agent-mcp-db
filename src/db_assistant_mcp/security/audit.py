@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
 import sys
 from datetime import UTC, datetime
@@ -69,16 +71,25 @@ class AuditLogger:
         url = self._config.webhook_url
         if not url:
             return
+        payload = json.dumps(entry, ensure_ascii=False).encode("utf-8")
         headers = {"Content-Type": "application/json"}
-        if self._config.webhook_secret_env:
-            import os
-
-            secret = os.environ.get(self._config.webhook_secret_env)
-            if secret:
-                headers["X-Db-Assistant-Signature"] = secret
+        secret = self._webhook_secret()
+        if secret:
+            digest = hmac.new(secret, payload, hashlib.sha256).hexdigest()
+            headers["X-Db-Assistant-Signature"] = f"sha256={digest}"
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=entry, headers=headers, timeout=aiohttp.ClientTimeout(total=3)) as resp:
+            async with session.post(url, data=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=3)) as resp:
                 resp.raise_for_status()
+
+    def _webhook_secret(self) -> bytes | None:
+        """从 webhook_secret_env 读取共享密钥（经 HMAC 签名 body，不再明文透传）。"""
+        env = self._config.webhook_secret_env
+        if not env:
+            return None
+        import os
+
+        value = os.environ.get(env)
+        return value.encode("utf-8") if value else None
 
     def record(self, *, tool: str, connection: str | None, sql: str | None, rows: int | None,
                duration_ms: float | None, allowed: bool, client: str | None = None,

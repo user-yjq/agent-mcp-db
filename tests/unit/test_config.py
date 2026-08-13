@@ -127,6 +127,41 @@ mode = "sudo"
         load_config(path)
 
 
+@pytest.mark.parametrize("mode", ["safe_write", "full"])
+def test_planned_write_modes_rejected(tmp_path, mode):
+    """v1 仅实现 read_only：safe_write/full 为规划中的写模式，配置即拒绝（fail-closed）。"""
+    path = _write(
+        tmp_path,
+        f"""
+[connections.pg]
+type = "postgres"
+host = "localhost"
+database = "orders"
+user = "svc"
+mode = "{mode}"
+""",
+    )
+    with pytest.raises(ConfigError, match="规划中的写模式"):
+        load_config(path)
+
+
+def test_planned_write_modes_rejected_server_section(tmp_path):
+    path = _write(
+        tmp_path,
+        """
+[server]
+mode = "full"
+[connections.pg]
+type = "postgres"
+host = "localhost"
+database = "orders"
+user = "svc"
+""",
+    )
+    with pytest.raises(ConfigError, match="规划中的写模式"):
+        load_config(path)
+
+
 def test_no_connections(tmp_path):
     path = _write(tmp_path, "[server]\nmode = \"read_only\"\n")
     with pytest.raises(ConfigError, match="connections"):

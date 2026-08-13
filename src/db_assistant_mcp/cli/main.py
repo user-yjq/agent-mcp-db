@@ -15,6 +15,8 @@ import typer
 from db_assistant_mcp import __version__
 from db_assistant_mcp.cli.diagnostics import check_config, run_doctor
 from db_assistant_mcp.config import (
+    PLANNED_MODES,
+    VALID_MODES,
     ConnectionConfig,
     _resolve_config_path,
     load_config,
@@ -112,7 +114,7 @@ def add(
     dbname: Annotated[str, typer.Option("--dbname", "-d", help="数据库名")] = "",
     user: Annotated[str, typer.Option("--user", "-u", help="用户名")] = "",
     password_env: Annotated[str | None, typer.Option("--password-env", help="密码环境变量名（推荐）")] = None,
-    mode: Annotated[str, typer.Option("--mode", help="read_only | safe_write | full")] = "read_only",
+    mode: Annotated[str, typer.Option("--mode", help="read_only（v1 唯一实现值；safe_write/full 规划中）")] = "read_only",
     ssl: Annotated[bool, typer.Option("--ssl", help="启用 TLS")] = False,
     masked_columns: Annotated[str | None, typer.Option("--masked", help="逗号分隔的脱敏列")] = None,
     exclude_columns: Annotated[str | None, typer.Option("--exclude-columns", help="逗号分隔的排除列")] = None,
@@ -126,6 +128,12 @@ def add(
         raise typer.Exit(1)
     if not name or not host or not dbname or not user:
         typer.echo("错误: --name/--host/--dbname/--user 均为必填", err=True)
+        raise typer.Exit(1)
+    if mode not in VALID_MODES:
+        if mode in PLANNED_MODES:
+            typer.echo(f"错误: mode={mode!r} 是规划中的写模式（v1 仅实现 read_only），请改为 read_only", err=True)
+        else:
+            typer.echo(f"错误: mode={mode!r} 非法，当前仅支持 {sorted(VALID_MODES)}", err=True)
         raise typer.Exit(1)
     port = port or (5432 if db_type == "postgres" else 3306)
 

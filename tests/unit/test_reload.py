@@ -58,7 +58,7 @@ def _write_config(tmp_path: Path, **kwargs) -> Path:
 def _registry(tmp_path: Path, **kwargs):
     app_config = load_config(str(_write_config(tmp_path, **kwargs)))
     mcp = create_server(app_config)
-    return mcp._registry  # type: ignore[attr-defined]
+    return mcp.registry
 
 
 # ---------- config 解析 ----------

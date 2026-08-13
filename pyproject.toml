@@ -8,9 +8,22 @@ version = "0.4.0"
 description = "MCP 数据库助手：为 AI 编程工具提供 PostgreSQL / MySQL 的只读数据库能力（schema 上下文、只读查询、执行计划、安全网关）"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "db-assistant team" }]
 keywords = ["mcp", "postgresql", "mysql", "read-only", "ai"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database :: Front-Ends",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "mcp>=1.2.0,<2",
     "asyncpg>=0.29.0,<1",
@@ -35,7 +48,8 @@ db-assistant = "db_assistant_mcp.cli.main:app"
 db-assistant-mcp = "db_assistant_mcp.__main__:main"
 
 [project.urls]
-Repository = "https://example.invalid/db-assistant-mcp"
+Repository = "https://github.com/user-yjq/agent-mcp-db"
+Homepage = "https://github.com/user-yjq/agent-mcp-db"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/db_assistant_mcp"]

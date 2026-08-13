@@ -76,11 +76,16 @@ async def _session(http_app) -> AsyncIterator[ClientSession]:
         headers={"Authorization": f"Bearer {TOKEN}"},
         follow_redirects=True,
     )
-    async with raw.router.lifespan_context(raw):
-        async with streamable_http_client(f"{BASE}/mcp", http_client=http_client) as (read, write, _get_session_id):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                yield session
+    try:
+        async with raw.router.lifespan_context(raw):
+            async with streamable_http_client(f"{BASE}/mcp", http_client=http_client) as (read, write, _get_session_id):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    yield session
+            # 等待服务端会话拆解与任务清理，避免事件循环关闭时遗留 pending task
+            await asyncio.sleep(0.05)
+    finally:
+        await http_client.aclose()
 
 
 # ---------- 鉴权 ----------
@@ -213,8 +218,8 @@ def _build_http_with_registry(tmp_path: Path, monkeypatch, *, max_concurrent: in
     app_config = load_config(str(_write_config(tmp_path, max_concurrent=max_concurrent)))
     mcp = create_server(app_config)
     app = mcp.streamable_http_app()
-    _attach_observability_routes(app, mcp._registry)  # type: ignore[attr-defined]
-    return BearerTokenMiddleware(app, TOKEN), mcp._registry  # type: ignore[attr-defined]
+    _attach_observability_routes(app, mcp.registry)
+    return BearerTokenMiddleware(app, TOKEN), mcp.registry
 
 
 @pytest.mark.asyncio

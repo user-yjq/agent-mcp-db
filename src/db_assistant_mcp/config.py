@@ -17,7 +17,9 @@ DEFAULT_CONFIG_PATH = Path("~/.config/db-assistant/config.toml").expanduser()
 ENV_REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 VALID_TYPES = {"postgres", "mysql"}
-VALID_MODES = {"read_only", "safe_write", "full"}
+VALID_MODES = {"read_only"}
+# 规划中的写模式：v1 仅实现 read_only，配置即拒绝，避免“声明了但未实现”的误导
+PLANNED_MODES = {"safe_write", "full"}
 VALID_AUDIT_OUTPUTS = {"file", "stdout", "stderr", "webhook"}
 
 
@@ -175,10 +177,23 @@ def _parse_int(raw: Any, name: str, *, default: int, min_value: int, max_value: 
     return raw
 
 
+def _validate_mode(section: str, mode: str) -> None:
+    if mode in VALID_MODES:
+        return
+    if mode in PLANNED_MODES:
+        raise ConfigError(
+            f"{section} 的 mode={mode!r} 是规划中的写模式（v1 仅实现 read_only，尚未实现），请改为 read_only",
+            detail=f"MODE_NOT_IMPLEMENTED:{mode}",
+        )
+    raise ConfigError(
+        f"{section} 的 mode 非法: {mode!r}，当前仅支持 {sorted(VALID_MODES)}",
+        detail=f"INVALID_MODE:{mode}",
+    )
+
+
 def _parse_server(raw: dict[str, Any]) -> ServerConfig:
     mode = raw.get("mode", "read_only")
-    if mode not in VALID_MODES:
-        raise ConfigError(f"[server].mode 非法: {mode!r}，可选 {sorted(VALID_MODES)}")
+    _validate_mode("[server]", mode)
     return ServerConfig(
         mode=mode,
         default_limit=_parse_int(raw.get("default_limit"), "server.default_limit", default=100, min_value=1, max_value=1000),
@@ -223,11 +238,7 @@ def _parse_connection(name: str, raw: dict[str, Any]) -> ConnectionConfig:
             detail=f"INVALID_TYPE:{name}:{conn_type}",
         )
     mode = raw.get("mode", "read_only")
-    if mode not in VALID_MODES:
-        raise ConfigError(
-            f"连接 '{name}' 的 mode 非法: {mode!r}，可选 {sorted(VALID_MODES)}",
-            detail=f"INVALID_MODE:{name}:{mode}",
-        )
+    _validate_mode(f"连接 '{name}'", mode)
     password_env = raw.get("password_env")
     password_encrypted = raw.get("password_encrypted")
     if not password_env and not password_encrypted:

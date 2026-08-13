@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "db-assistant": {
+      "url": "https://mcp.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer <DB_ASSISTANT_HTTP_TOKEN>"
+      }
+    }
+  }
+}

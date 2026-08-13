@@ -84,7 +84,7 @@ def _build_server(tmp_path: Path, *, audit_output: str = "stdout"):
 
 def _patch_pool(mcp, *, first_fails: bool, second_fails: bool = False):
     """把 demo 连接池的建连工厂替换为可注入故障的假连接，返回 (created 计数, first, second)。"""
-    registry = mcp._registry  # type: ignore[attr-defined]
+    registry = mcp.registry
     pool = registry.get("demo").pool
     first = StubConn(fail_first=first_fails)
     second = StubConn(fail_first=second_fails)

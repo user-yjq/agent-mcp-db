@@ -1,0 +1,9 @@
+# 追加到 ~/.codex/config.toml（或 ~/.config/codex/config.toml）
+# 命令路径与 env 请按实际环境替换；密码仅经环境变量注入，不落盘。
+[mcp_servers.db-assistant]
+command = "/opt/db-assistant/.venv/bin/db-assistant-mcp"
+
+[mcp_servers.db-assistant.env]
+DB_ASSISTANT_CONFIG = "/opt/db-assistant/config/codex-local.toml"
+DB_ASSISTANT_CODEX_PG_PASSWORD = "test"
+DB_ASSISTANT_CODEX_MYSQL_PASSWORD = "test"

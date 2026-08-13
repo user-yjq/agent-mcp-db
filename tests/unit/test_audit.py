@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 
 from db_assistant_mcp.config import AuditConfig
@@ -60,6 +62,64 @@ def test_webhook_unreachable_does_not_raise(tmp_path):
     audit = _audit(tmp_path, output="webhook", webhook_url="http://127.0.0.1:1/nope")
     audit.record(tool="execute_query", connection="c", sql="SELECT 1", rows=0,
                  duration_ms=1, allowed=True)  # 不应抛异常
+
+
+def test_webhook_hmac_signature(tmp_path, monkeypatch):
+    """webhook 推送以 HMAC-SHA256 签名 body（sha256=<hex>），不再明文透传密钥。"""
+    captured: dict[str, object] = {}
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        async def __aenter__(self) -> FakeResponse:
+            return self
+
+        async def __aexit__(self, *args) -> bool:
+            return False
+
+    class FakeRequest:
+        def __init__(self, url, data, headers) -> None:
+            self.url = url
+            self.data = data
+            self.headers = headers
+
+        async def __aenter__(self) -> FakeResponse:
+            captured["url"] = self.url
+            captured["data"] = self.data
+            captured["headers"] = self.headers
+            return FakeResponse()
+
+        async def __aexit__(self, *args) -> bool:
+            return False
+
+    class FakeSession:
+        async def __aenter__(self) -> FakeSession:
+            return self
+
+        async def __aexit__(self, *args) -> bool:
+            return False
+
+        def post(self, url, data, headers, timeout):
+            # aiohttp 的 session.post() 返回 _RequestContextManager（支持 async with），而非裸协程
+            return FakeRequest(url, data, headers)
+
+    monkeypatch.setattr("aiohttp.ClientSession", lambda: FakeSession())
+    monkeypatch.setenv("DB_ASSISTANT_WEBHOOK_SECRET", "s3cret")
+    audit = _audit(
+        tmp_path,
+        output="webhook",
+        webhook_url="http://hook.example/audit",
+        webhook_secret_env="DB_ASSISTANT_WEBHOOK_SECRET",
+    )
+    audit.record(tool="execute_query", connection="c", sql="SELECT 1", rows=0,
+                 duration_ms=1, allowed=True)
+
+    assert captured["url"] == "http://hook.example/audit"
+    assert isinstance(captured["data"], bytes)
+    expected = "sha256=" + hmac.new(b"s3cret", captured["data"], hashlib.sha256).hexdigest()
+    assert captured["headers"]["X-Db-Assistant-Signature"] == expected
+    assert b"s3cret" not in captured["data"]  # 密钥不出现在请求体中
 
 
 def test_read_filters(tmp_path):

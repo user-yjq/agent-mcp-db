@@ -38,7 +38,17 @@ from db_assistant_mcp.tools import (
 logger = get_logger("db_assistant_mcp.server")
 
 
-def create_server(app_config: AppConfig, *, host: str | None = None, port: int | None = None) -> FastMCP:
+class DbAssistantFastMCP(FastMCP):
+    """FastMCP + 运行期 registry 引用（供 /healthz /metrics 路由使用，替代私有属性 hack）。"""
+
+    def __init__(self, registry: RuntimeRegistry, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.registry = registry
+
+
+def create_server(
+    app_config: AppConfig, *, host: str | None = None, port: int | None = None
+) -> DbAssistantFastMCP:
     """装配 MCP Server（stdio/HTTP 共用）。host/port 仅影响 streamable-http 模式。"""
     audit_config = app_config.audit
     if host is None and audit_config.output == "stdout":
@@ -60,28 +70,31 @@ def create_server(app_config: AppConfig, *, host: str | None = None, port: int |
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncIterator[dict[str, object]]:
         http_runner = None
-        if app_config.metrics.enabled:
-            try:
-                http_runner, _site = await start_http_server(registry, app_config.metrics.port)
-                log_context(logger, 20, "指标端点已启动", port=app_config.metrics.port)
-            except OSError as exc:
-                log_context(logger, 40, "指标端点启动失败（端口冲突）", port=app_config.metrics.port, error=str(exc))
         reload_task = None
-        reload_interval = app_config.server.config_reload_interval_sec
-        if reload_interval > 0:
-            reload_task = asyncio.create_task(
-                _config_reload_loop(registry, app_config.config_path, reload_interval)
-            )
-        yield {"registry": registry}
-        if reload_task is not None:
-            reload_task.cancel()
-            try:
-                await reload_task
-            except asyncio.CancelledError:
-                pass
-        if http_runner:
-            await http_runner.cleanup()
-        await registry.close_all()
+        try:
+            if app_config.metrics.enabled:
+                try:
+                    http_runner, _site = await start_http_server(registry, app_config.metrics.port)
+                    log_context(logger, 20, "指标端点已启动", port=app_config.metrics.port)
+                except OSError as exc:
+                    log_context(logger, 40, "指标端点启动失败（端口冲突）", port=app_config.metrics.port, error=str(exc))
+            reload_interval = app_config.server.config_reload_interval_sec
+            if reload_interval > 0:
+                reload_task = asyncio.create_task(
+                    _config_reload_loop(registry, app_config.config_path, reload_interval)
+                )
+            yield {"registry": registry}
+        finally:
+            # 无论正常退出还是异常/取消，都保证任务被回收、连接被关闭
+            if reload_task is not None:
+                reload_task.cancel()
+                try:
+                    await reload_task
+                except asyncio.CancelledError:
+                    pass
+            if http_runner:
+                await http_runner.cleanup()
+            await registry.close_all()
 
     kwargs: dict[str, Any] = {}
     if host is not None:
@@ -89,7 +102,8 @@ def create_server(app_config: AppConfig, *, host: str | None = None, port: int |
     if port is not None:
         kwargs["port"] = port
 
-    mcp = FastMCP(
+    mcp = DbAssistantFastMCP(
+        registry,
         "db-assistant-mcp",
         instructions=(
             "PostgreSQL/MySQL 只读数据库助手。所有查询默认只读，自动限制行数与超时，"
@@ -99,7 +113,6 @@ def create_server(app_config: AppConfig, *, host: str | None = None, port: int |
         lifespan=lifespan,
         **kwargs,
     )
-    mcp._registry = registry  # type: ignore[attr-defined]  # 供 HTTP 模式挂 /healthz /metrics
 
     for fn in schema_tools.register(registry).values():
         mcp.tool()(fn)
@@ -165,7 +178,12 @@ async def _config_reload_loop(registry: RuntimeRegistry, config_path: str, inter
     """周期轮询配置文件变更并热重载；加载失败保留旧配置继续服务（下个周期自动重试）。"""
     last_stat = _config_stat(config_path)
     while True:
-        await asyncio.sleep(interval)
+        try:
+            await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            # 显式处理取消，避免被下方 except Exception 吞掉（Py3.11+ CancelledError 虽已是
+            # BaseException，但保持意图明确，防止未来重构引入回归）
+            raise
         try:
             changed, summary = await reload_config_if_changed(registry, config_path, last_stat)
         except Exception as exc:  # noqa: BLE001
@@ -186,7 +204,7 @@ def build_http_app(
     auth_token = token if token is not None else resolve_http_token(http)
     mcp = create_server(app_config, host=effective_host, port=effective_port)
     app = mcp.streamable_http_app()
-    _attach_observability_routes(app, mcp._registry)  # type: ignore[attr-defined]
+    _attach_observability_routes(app, mcp.registry)
     return BearerTokenMiddleware(app, auth_token)
 
 

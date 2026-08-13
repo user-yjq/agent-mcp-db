@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "db-assistant": {
+      "command": "/opt/db-assistant/.venv/bin/db-assistant-mcp",
+      "env": {
+        "DB_ASSISTANT_CONFIG": "/opt/db-assistant/config/codex-local.toml",
+        "DB_ASSISTANT_CODEX_PG_PASSWORD": "test",
+        "DB_ASSISTANT_CODEX_MYSQL_PASSWORD": "test"
+      }
+    }
+  }
+}
